@@ -44,26 +44,26 @@ $actualCommit = (& git -C $cppDir rev-parse HEAD).Trim()
 if ($actualCommit -ne $lock.godot_cpp.commit) { throw "godot-cpp commit mismatch: $actualCommit" }
 
 Write-Host 'Generating extension_api.json from the locked custom engine...'
-Push-Location $root
+$probe = Join-Path $toolsDir 'api-probe'
+New-Item -ItemType Directory -Force $probe | Out-Null
+Set-Content -LiteralPath (Join-Path $probe 'project.godot') -Value 'config_version=5' -Encoding UTF8
+Push-Location $probe
 try {
-    Write-Host "Godot dump working dir: $(Get-Location)"
-    & $editor --headless --editor --dump-extension-api
+    Write-Host "Godot API probe directory: $(Get-Location)"
+    & $editor --headless --editor --path $probe --dump-extension-api
     if ($LASTEXITCODE -ne 0) { throw 'Godot --dump-extension-api failed' }
 } finally { Pop-Location }
-# The editor puts extension_api.json beside the executable in some builds.
-# Do not accidentally select godot-cpp's bundled generic API.
+# Search only the generated probe and binary paths, never the godot-cpp bundled vanilla API.
 $candidates = @(
+    (Join-Path $probe 'extension_api.json'),
     (Join-Path $toolsDir 'extension_api.json'),
     (Join-Path $root 'extension_api.json'),
     (Join-Path $root 'godot/extension_api.json')
 )
-$foundApi = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $foundApi) {
-    $discovered = @(Get-ChildItem -LiteralPath $root -File -Filter 'extension_api.json' -Recurse -ErrorAction SilentlyContinue)
-    Write-Host "Found API files: $($discovered.FullName -join '; ')"
-    $foundApi = $discovered | Where-Object { $_.FullName -notmatch 'godot-cpp' } | Select-Object -First 1 -ExpandProperty FullName
-}
-if (-not $foundApi) { throw "Custom API missing from expected editor/output paths: $($candidates -join ', ')" }
+Write-Host "API probe files:"
+Get-ChildItem -LiteralPath $probe -Force -File | ForEach-Object { Write-Host $_.FullName }
+$foundApi = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+if (-not $foundApi) { throw "Custom Godot API missing: $($candidates -join '; ')" }
 $api = Join-Path $root 'extension_api.json'
 if ($foundApi -ne $api) { Copy-Item -LiteralPath $foundApi -Destination $api -Force }
 Write-Host "Found custom API: $foundApi"

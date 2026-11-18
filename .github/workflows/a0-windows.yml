@@ -28,7 +28,7 @@ jobs:
           version: "0.13.9"
           enable-cache: false
       - name: Install workspace-local Python and SCons
-        shell: pwsh
+        shell: powershell
         run: |
           uv python install 3.12
           if ($LASTEXITCODE -ne 0) { throw 'uv python install failed' }
@@ -41,13 +41,13 @@ jobs:
           & .venv/Scripts/python.exe --version
           & .venv/Scripts/scons.exe --version
       - name: Static A0 contract validation
-        shell: pwsh
+        shell: powershell
         run: python tests/check_a0_contract.py
       - name: Fetch pinned engine, generate custom API, compile native code
-        shell: pwsh
+        shell: powershell
         run: ./scripts/bootstrap-windows.ps1
       - name: Headless module and GDExtension smoke
-        shell: pwsh
+        shell: powershell
         run: ./scripts/smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()

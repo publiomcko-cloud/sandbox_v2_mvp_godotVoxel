@@ -15,6 +15,10 @@ concurrency:
 jobs:
   smoke:
     runs-on: [self-hosted, Windows, X64]
+    # Process-only policy for setup-python's internal PowerShell installer.
+    # Does not modify machine-wide or per-user execution policy.
+    env:
+      PSExecutionPolicyPreference: Bypass
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4

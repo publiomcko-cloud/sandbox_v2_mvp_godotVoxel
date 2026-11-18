@@ -2,7 +2,6 @@
 
 #include <godot_cpp/classes/voxel_lod_terrain.hpp>
 #include <godot_cpp/classes/voxel_tool.hpp>
-#include <godot_cpp/classes/class_db.hpp>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/node_path.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>

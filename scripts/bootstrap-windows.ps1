@@ -49,8 +49,18 @@ try {
     & $editor --headless --dump-extension-api
     if ($LASTEXITCODE -ne 0) { throw 'Godot --dump-extension-api failed' }
 } finally { Pop-Location }
+# The editor puts extension_api.json beside the executable in some builds.
+# Do not accidentally select godot-cpp's bundled generic API.
+$candidates = @(
+    (Join-Path $toolsDir 'extension_api.json'),
+    (Join-Path $root 'extension_api.json'),
+    (Join-Path $root 'godot/extension_api.json')
+)
+$foundApi = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $foundApi) { throw "Custom API missing from expected editor/output paths: $($candidates -join ', ')" }
 $api = Join-Path $root 'extension_api.json'
-if (-not (Test-Path $api)) { throw "extension_api.json missing: $api" }
+if ($foundApi -ne $api) { Copy-Item -LiteralPath $foundApi -Destination $api -Force }
+Write-Host "Found custom API: $foundApi"
 $apiData = Get-Content $api -Raw | ConvertFrom-Json
 if (-not ($apiData.classes | Where-Object { $_.name -eq 'VoxelLodTerrain' })) {
     throw 'Custom Godot API contains no VoxelLodTerrain; wrong engine binary'

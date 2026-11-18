@@ -1,0 +1,40 @@
+name: A0 Windows build and voxel API smoke
+on:
+  push:
+    branches: [main, "feat/a0-*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: windows-2022
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned build tooling
+        shell: pwsh
+        run: python -m pip install scons==4.10.0
+      - name: Static A0 contract validation
+        shell: pwsh
+        run: python tests/check_a0_contract.py
+      - name: Fetch pinned engine, generate custom API, compile native code
+        shell: pwsh
+        run: ./scripts/bootstrap-windows.ps1
+      - name: Headless module and GDExtension smoke
+        shell: pwsh
+        run: ./scripts/smoke-windows.ps1
+      - name: Publish bootstrap build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a0-build-snapshot
+          if-no-files-found: ignore
+          path: |
+            godot/bin/*.dll
+            extension_api.json

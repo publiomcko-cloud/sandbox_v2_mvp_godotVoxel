@@ -50,8 +50,9 @@ Set-Content -LiteralPath (Join-Path $probe 'project.godot') -Value 'config_versi
 Push-Location $probe
 try {
     Write-Host "Godot API probe directory: $(Get-Location)"
-    & $editor --headless --editor --path $probe --dump-extension-api
-    if ($LASTEXITCODE -ne 0) { throw 'Godot --dump-extension-api failed' }
+    # Windows GUI-subsystem executables may return to PowerShell before the process exits.
+    $dump = Start-Process -FilePath $editor -ArgumentList @('--headless', '--editor', '--path', ('"' + $probe + '"'), '--dump-extension-api') -Wait -PassThru -NoNewWindow
+    if ($dump.ExitCode -ne 0) { throw "Godot --dump-extension-api failed: exit=$($dump.ExitCode)" }
 } finally { Pop-Location }
 # Search only the generated probe and binary paths, never the godot-cpp bundled vanilla API.
 $candidates = @(

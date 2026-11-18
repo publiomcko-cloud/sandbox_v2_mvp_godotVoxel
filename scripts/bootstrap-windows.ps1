@@ -46,7 +46,8 @@ if ($actualCommit -ne $lock.godot_cpp.commit) { throw "godot-cpp commit mismatch
 Write-Host 'Generating extension_api.json from the locked custom engine...'
 Push-Location $root
 try {
-    & $editor --headless --dump-extension-api
+    Write-Host "Godot dump working dir: $(Get-Location)"
+    & $editor --headless --editor --dump-extension-api
     if ($LASTEXITCODE -ne 0) { throw 'Godot --dump-extension-api failed' }
 } finally { Pop-Location }
 # The editor puts extension_api.json beside the executable in some builds.
@@ -57,6 +58,11 @@ $candidates = @(
     (Join-Path $root 'godot/extension_api.json')
 )
 $foundApi = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if (-not $foundApi) {
+    $discovered = @(Get-ChildItem -LiteralPath $root -File -Filter 'extension_api.json' -Recurse -ErrorAction SilentlyContinue)
+    Write-Host "Found API files: $($discovered.FullName -join '; ')"
+    $foundApi = $discovered | Where-Object { $_.FullName -notmatch 'godot-cpp' } | Select-Object -First 1 -ExpandProperty FullName
+}
 if (-not $foundApi) { throw "Custom API missing from expected editor/output paths: $($candidates -join ', ')" }
 $api = Join-Path $root 'extension_api.json'
 if ($foundApi -ne $api) { Copy-Item -LiteralPath $foundApi -Destination $api -Force }

@@ -19,6 +19,8 @@ jobs:
     # Does not modify machine-wide or per-user execution policy.
     env:
       PSExecutionPolicyPreference: Bypass
+      # Persistent outside the checkout to avoid rebuilding all godot-cpp objects.
+      SCONS_CACHE: ${{ runner.tool_cache }}/sandbox-voxel-a0-scons-cache
     timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +47,9 @@ jobs:
         run: python tests/check_a0_contract.py
       - name: Fetch pinned engine, generate custom API, compile native code
         shell: powershell
-        run: ./scripts/bootstrap-windows.ps1
+        run: |
+          New-Item -ItemType Directory -Force $env:SCONS_CACHE | Out-Null
+          ./scripts/bootstrap-windows.ps1
       - name: Headless module and GDExtension smoke
         shell: powershell
         run: ./scripts/smoke-windows.ps1

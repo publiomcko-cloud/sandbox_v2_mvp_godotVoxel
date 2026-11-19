@@ -14,7 +14,7 @@ var _saving := false
 @onready var status: Label = get_parent().get_node("HUD/Status")
 
 func _ready() -> void:
-    _set_status("A3: click capture | LMB carve / RMB add | Ctrl+S save | Esc release")
+    _set_status("A5: G physical swim | F rock | LMB carve/RMB add | Ctrl+S save | Esc")
 
 func _set_status(message: String) -> void:
     if status:

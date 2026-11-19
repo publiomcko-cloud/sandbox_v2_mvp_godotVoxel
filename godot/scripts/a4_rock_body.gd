@@ -5,6 +5,12 @@ extends RigidBody3D
 var restored_from_disk: bool = false
 
 func _ready() -> void:
+    # 0.7m radius: geometric volume 1.437m3; at 3600kg the rock sinks
+    # in 1000kg/m3 water. Collision scale stays as configured by the scene.
+    var s := global_transform.basis.get_scale()
+    var scale_volume := absf(s.x * s.y * s.z)
+    set_meta("a5_displaced_volume_m3", 1.436755 * scale_volume)
+    set_meta("a5_water_radius_m", 0.7 * maxf(s.x, maxf(s.y, s.z)))
     if rock_id.is_empty():
         var p := global_position
         rock_id = "x%d_y%d_z%d" % [roundi(p.x * 100.0), roundi(p.y * 100.0), roundi(p.z * 100.0)]

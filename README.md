@@ -9,6 +9,7 @@ MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 in
 - [Contrato comum de requisitos e benchmarks](docs/CRITERIOS_COMUNS.md)
 - [A0: bootstrap, execução e gates](docs/A0_IMPLEMENTACAO.md)
 - [A1: mundo SDF, cavernas e LOD](docs/A1_IMPLEMENTACAO.md)
+- [A2: rotas determinísticas, streaming e telemetria](docs/A2_IMPLEMENTACAO.md)
 
 ## A0 Windows (PowerShell)
 Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
@@ -23,3 +24,12 @@ O bootstrap usa o editor Godot+Voxel Tools oficial do release v1.7, confere SHA-
 A1 usa `VoxelGeneratorGraph` determinístico para relevo, túnel curvo subterrâneo e acesso vertical em aproximadamente (x=38,z=0), com um único `VoxelLodTerrain` + Transvoxel. Solicita 192 unidades de view distance e 4 LODs; 130 m efetivamente visíveis e costuras sem falhas precisam de teste gráfico, não de smoke headless. W/A/S/D movem a 18 m/s, E/Q controlam altura; clique esquerdo captura o mouse e Escape libera. Este observador não possui colisão.
 
 Princípios: um único sistema de terreno/LOD, geometria válida retida até substituição, recursos não antecipam terreno, tarefas e publicação limitadas por orçamento e qualificações por benchmark gráfico real. Ver detalhes nos documentos de arquitetura.
+
+## A2 — benchmark gráfico reproduzível (experimental)
+Sem substituir o streamer do Voxel Tools. Registra rotas a 18 m/s e métricas de frame/filas/meshing (não confundir intervalos CPU com GPU+present).
+
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a2-benchmark-windows.ps1 -Route out_and_back_18mps_300s -Duration 300 -Warmup 45
+\`\`\`
+
+JSONL e resumo aparecem em \`reports/generated/\`. Para capturas periódicas, inclua \`-Capture\`, em execução separada. A aprovação visual 18m/s e 130m efetivos ainda requer inspeção dos resultados.

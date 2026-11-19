@@ -1,4 +1,4 @@
-name: A0/A1 Windows native build and graph smoke
+name: A0/A1/A2 Windows native build and streaming smoke
 on:
   push:
     branches: [main]
@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: a0-${{ github.event.pull_request.head.ref || github.ref_name }}
@@ -53,16 +54,28 @@ jobs:
       - name: Static A1 contract validation
         shell: powershell
         run: python tests/check_a1_contract.py
-      - name: Fetch pinned engine, generate custom API, compile native code
+      - name: Static A2 route and telemetry contract
         shell: powershell
-        run: |
-          ./scripts/bootstrap-windows.ps1
+        run: python tests/check_a2_contract.py
+      - name: Restore approved A1 native build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: a0-build-snapshot
+          run-id: 44507482206
+          github-token: ${{ github.token }}
+          path: .
+      - name: Verify locked custom engine and approved A1 ABI (no native recompilation)
+        shell: powershell
+        run: ./scripts/bootstrap-windows.ps1 -RuntimeOnly
       - name: Headless module and GDExtension smoke
         shell: powershell
         run: ./scripts/smoke-windows.ps1
       - name: A1 deterministic SDF and scene smoke
         shell: powershell
         run: ./scripts/a1-smoke-windows.ps1
+      - name: A2 deterministic route and headless trace smoke
+        shell: powershell
+        run: ./scripts/a2-smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,3 +85,5 @@ jobs:
           path: |
             godot/bin/*.dll
             extension_api.json
+            reports/generated/a2-ci/*.json
+            reports/generated/a2-ci/*.jsonl

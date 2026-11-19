@@ -14,6 +14,7 @@ MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 in
 - [A4: rochas em MultiMesh, promoção para RigidBody e estado persistido](docs/A4_IMPLEMENTACAO.md)
 - [A5: oceano y=0, empuxo, arrasto, corrente e nado](docs/A5_IMPLEMENTACAO.md)
 - [A6: comparação CPU/GPU Vulkan com blocos 16/32](docs/A6_IMPLEMENTACAO.md)
+- [A6B: investigação direcionada das sondas de blocos 32 e fronteiras LOD](docs/A6B_DIAGNOSTICO.md)
 
 ## A0 Windows (PowerShell)
 Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
@@ -80,3 +81,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a6-run-windows.ps1
 \`\`\`
 
 Relatórios em \`reports/generated/a6/\`; envie os \`.json\` e \`.jsonl\` para avaliação de p99, filas e buffers. O CI testa configuração CPU16/CPU32 *headless*, não qualifica GPU nem apresentação visual. O comparador \`scripts/a6_compare.py\` **nunca promove** candidatos automaticamente. Consulte \`docs/A6_IMPLEMENTACAO.md\`.
+
+
+## A6B — investigar 7/8 sondas com bloco 32
+
+A campanha gráfica A6 de 12 sessões identificou cinco posições de 7/8 sondas com blocos de 32 (t≈7, 64, 135, 236 e 250s). Todas ficam próximas a uma fronteira da grade LOD2 de 128m; **correlação não comprova falta de terreno**. O diagnóstico A6B conserva A5 CPU16 e usa a mesma cena, seed e renderer Vulkan para dividir cada AABB em quatro sub-áreas e testar cobertura por LOD, além de capturas PNG dos cinco pontos. Não repete a campanha de 69 minutos.
+
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a6b-run-windows.ps1 -Capture
+\`\`\`
+
+Relatórios e até 40 screenshots em \`reports/generated/a6b/diagnostic-...\`. O CI headless valida apenas o primeiro ponto em CPU16/CPU32; o usuário precisa verificar as imagens e a edição antes de qualquer promoção.

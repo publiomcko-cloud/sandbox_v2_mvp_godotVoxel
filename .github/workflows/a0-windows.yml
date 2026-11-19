@@ -1,4 +1,4 @@
-name: A0-A6 Windows integration and CPU/GPU A/B preflight
+name: A0-A6B Windows integration, A/B preflight and LOD probe diagnosis
 on:
   push:
     branches: [main]
@@ -71,6 +71,9 @@ jobs:
       - name: A6 A/B contract, renderer parity and fail-closed comparator
         shell: powershell
         run: python tests/check_a6_contract.py
+      - name: A6B five-site geometry and split-LOD probe contract
+        shell: powershell
+        run: python tests/check_a6b_contract.py
       - name: Restore compiled native binary from approved A3 CI
         uses: actions/download-artifact@v4
         with:
@@ -102,6 +105,9 @@ jobs:
       - name: A6 CPU16/CPU32 headless config and telemetry smoke (GPU not qualified)
         shell: powershell
         run: ./scripts/a6-smoke-windows.ps1
+      - name: A6B CPU16 and CPU32 first-site headless probe smoke
+        shell: powershell
+        run: ./scripts/a6b-run-windows.ps1 -Site t007 -CiSmoke
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -118,3 +124,4 @@ jobs:
             reports/generated/a5-ci/*.json
             reports/generated/a6-ci/**/*.json
             reports/generated/a6-ci/**/*.jsonl
+            reports/generated/a6b-ci/**/*.json

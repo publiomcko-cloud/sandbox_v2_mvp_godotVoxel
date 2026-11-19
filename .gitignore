@@ -19,3 +19,6 @@ third_party/godot-cpp/
 native/.sconsign.dblite
 # Reports remain ignored until an explicitly reviewed artifact is selected
 reports/generated/
+
+# Local Python/SCons environment
+.venv/

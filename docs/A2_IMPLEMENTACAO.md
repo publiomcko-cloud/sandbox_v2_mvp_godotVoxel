@@ -54,3 +54,8 @@ As métricas são coletadas com a mesma instrumentação na baseline e em futuro
 **Importante:** warmup fixo de 45 s não comprova que o horizonte visual está integralmente preparado. O log indica readiness *não pixel verificada*. O gate de cobertura inicial só pode ser liberado por inspeção gráfica com evidência. Não há pausa automática, teleporte ou neblina para mascarar falhas.
 
 A próxima intervenção após o diagnóstico será comparar política nativa atual contra ajustes controlados de LOD/blocos/prefetch, sem reduzir 130m nem alterar a carga de instrumentação entre braços.
+
+
+## Reuso verificável do binário nativo da A1
+
+A2 altera apenas scripts, documentação e testes: as quatro fontes de \`native/\` não sofreram alterações. O CI exige hashes Git-blob idênticos aos da A1 aprovada (\`8feb581\`), restaura o artefato \`a0-build-snapshot\` da execução [44507482206](https://github.com/publiomcko-labs/sandbox_v2_mvp_godotVoxel/actions/runs/44507482206) e valida que o editor é a versão pinada no lockfile. Não há recompilação C++ desnecessária nem dependência de MSVC no runner que executa o teste de scripts. **Se o código nativo mudar, o guard deve reprovar e exigir nova compilação/novo artefato.** A disponibilidade do artefato depende da retenção do GitHub Actions.

@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: a0-${{ github.event.pull_request.head.ref || github.ref_name }}
@@ -56,10 +57,16 @@ jobs:
       - name: Static A2 route and telemetry contract
         shell: powershell
         run: python tests/check_a2_contract.py
-      - name: Fetch pinned engine, generate custom API, compile native code
+      - name: Restore approved A1 native build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: a0-build-snapshot
+          run-id: 44507482206
+          github-token: ${{ github.token }}
+          path: .
+      - name: Verify locked custom engine and approved A1 ABI (no native recompilation)
         shell: powershell
-        run: |
-          ./scripts/bootstrap-windows.ps1
+        run: ./scripts/bootstrap-windows.ps1 -RuntimeOnly
       - name: Headless module and GDExtension smoke
         shell: powershell
         run: ./scripts/smoke-windows.ps1

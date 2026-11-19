@@ -1,7 +1,8 @@
 param(
     [ValidateSet('template_debug','template_release')]
     [string] $Target = 'template_debug',
-    [switch] $SkipDownload
+    [switch] $SkipDownload,
+    [switch] $RuntimeOnly
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -28,6 +29,22 @@ if (-not $SkipDownload) {
     Copy-Item -LiteralPath $executable.FullName -Destination $editor -Force
 }
 if (-not (Test-Path $editor)) { throw "Missing editor: $editor" }
+
+if ($RuntimeOnly) {
+    # A2 changes no native sources. Reuse the exact DLL and custom API from
+    # the successfully compiled A1 artifact, after static SHA checks.
+    $dll = Join-Path $root "godot/bin/sandbox_native.windows.$Target.x86_64.dll"
+    $apiFile = Join-Path $root 'extension_api.json'
+    if (-not (Test-Path $dll)) { throw "A2 locked snapshot DLL missing: $dll" }
+    if (-not (Test-Path $apiFile)) { throw "A2 locked snapshot API missing: $apiFile" }
+    $apiData = Get-Content -LiteralPath $apiFile -Raw | ConvertFrom-Json
+    if (-not ($apiData.classes | Where-Object { $_.name -eq 'VoxelLodTerrain' })) {
+        throw 'A2 snapshot API missing VoxelLodTerrain'
+    }
+    Write-Host "A2_LOCKED_RUNTIME_OK: verified editor and locked A1 API/DLL"
+    return
+}
+
 
 # GitHub Actions checkout can fall back to a source archive when Git is absent.
 # Fetch godot-cpp at its exact locked SHA through the same GitHub source endpoint.

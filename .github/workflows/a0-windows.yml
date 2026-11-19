@@ -1,4 +1,4 @@
-name: A0-A4 Windows integration and rock physics smoke
+name: A0-A5 Windows integration, rocks and water smoke
 on:
   push:
     branches: [main]
@@ -65,6 +65,9 @@ jobs:
       - name: A4 static and native A3 ABI parity
         shell: powershell
         run: python tests/check_a4_contract.py
+      - name: A5 water, swimmer and shoreline static contract
+        shell: powershell
+        run: python tests/check_a5_contract.py
       - name: Restore compiled native binary from approved A3 CI
         uses: actions/download-artifact@v4
         with:
@@ -90,6 +93,9 @@ jobs:
       - name: A4 batched instancing, physics fixture and persistence reopen
         shell: powershell
         run: ./scripts/a4-smoke-windows.ps1
+      - name: A5 buoyancy, current and shoreline SQLite reopen smoke
+        shell: powershell
+        run: ./scripts/a5-smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -103,3 +109,4 @@ jobs:
             reports/generated/a2-ci/*.jsonl
             reports/generated/a3-ci/*.json
             reports/generated/a4-ci/*.json
+            reports/generated/a5-ci/*.json

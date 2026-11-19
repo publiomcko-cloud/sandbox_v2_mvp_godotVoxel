@@ -8,6 +8,7 @@ var duration_sec: float = 0.0
 var warmup_sec: float = 45.0
 var ci_smoke: bool = false
 var capture_screenshots: bool = false
+var a6_profile: String = ""
 
 var _terrain: VoxelLodTerrain
 var _player: Node3D
@@ -19,6 +20,8 @@ var _last_frame_usec: int = -1
 var _next_sample_sec: float = 1.0
 var _next_capture_sec: float = 30.0
 var _frames_ms: Array[float] = []
+var _render_cpu_ms: Array[float] = []
+var _render_gpu_ms: Array[float] = []
 var _over_16_7: int = 0
 var _over_20: int = 0
 var _over_33: int = 0
@@ -59,11 +62,18 @@ func _ready() -> void:
         get_tree().quit(2)
         return
 
+    if not a6_profile.is_empty() and DisplayServer.get_name() != "headless":
+        RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
     _start_usec = Time.get_ticks_usec()
     print("A2_BENCH_START route=", route, " warmup_s=", warmup_sec,
           " duration_s=", duration_sec, " headless=", DisplayServer.get_name() == "headless")
     print("A2_JSONL=", path)
     _emit({"type": "metadata", "schema": "a2_v1", "route": route,
+           "a6_profile": a6_profile, "a6_gpu_requested": _terrain.use_gpu_generation,
+           "rendering_method_actual": RenderingServer.get_current_rendering_method(),
+           "rendering_driver_actual": RenderingServer.get_current_rendering_driver_name(),
+           "hardware_cpu": OS.get_processor_name(),
+           "voxel_tools_version": VoxelEngine.get_version_v() if not a6_profile.is_empty() else Vector3i.ZERO,
            "seed": 20261119, "speed_mps": Routes.SPEED_MPS,
            "target_radius_m": 130, "requested_view_distance": _terrain.view_distance,
            "lod_count": _terrain.lod_count, "mesh_block_size": _terrain.mesh_block_size,
@@ -104,7 +114,10 @@ func _emit_progress(phase: String, t: float) -> void:
         "engine_fps": Engine.get_frames_per_second(),
         "process_cpu_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
         "physics_cpu_ms": Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
-        "terrain_stats": st
+        "a6_profile": a6_profile, "terrain_stats": st,
+        "voxel_engine_stats": VoxelEngine.get_stats() if not a6_profile.is_empty() else {},
+        "viewport_render_cpu_ms": RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid()) if not a6_profile.is_empty() else 0.0,
+        "viewport_render_gpu_ms": RenderingServer.viewport_get_measured_render_time_gpu(get_viewport().get_viewport_rid()) if not a6_profile.is_empty() else 0.0
     }
     _emit(row)
     _samples_written += 1
@@ -145,6 +158,14 @@ func _process(_delta: float) -> void:
     _last_frame_usec = now
     if interval_ms > 0.0:
         _frames_ms.append(interval_ms)
+        if not a6_profile.is_empty() and DisplayServer.get_name() != "headless":
+            var rid := get_viewport().get_viewport_rid()
+            var render_cpu := RenderingServer.viewport_get_measured_render_time_cpu(rid)
+            var render_gpu := RenderingServer.viewport_get_measured_render_time_gpu(rid)
+            if render_cpu > 0.0:
+                _render_cpu_ms.append(render_cpu)
+            if render_gpu > 0.0:
+                _render_gpu_ms.append(render_gpu)
         _worst_interval_ms = maxf(_worst_interval_ms, interval_ms)
         if interval_ms > 16.7:
             _over_16_7 += 1
@@ -174,9 +195,18 @@ func _percentile(sorted: Array[float], q: float) -> float:
 
 func _finish() -> void:
     _frames_ms.sort()
+    _render_cpu_ms.sort()
+    _render_gpu_ms.sort()
     var frames := _frames_ms.size()
     var summary := {
         "schema": "a2_v1", "type": "summary", "route": route,
+        "a6_profile": a6_profile, "mesh_block_size": _terrain.mesh_block_size,
+        "lod_distance_m": _terrain.lod_distance,
+        "view_distance_m": _terrain.view_distance,
+        "a6_gpu_requested": _terrain.use_gpu_generation,
+        "rendering_method_actual": RenderingServer.get_current_rendering_method(),
+        "rendering_driver_actual": RenderingServer.get_current_rendering_driver_name(),
+        "hardware_cpu": OS.get_processor_name(),
         "seed": 20261119, "speed_mps": Routes.SPEED_MPS,
         "duration_sec": duration_sec, "warmup_sec": warmup_sec,
         "frame_intervals_observed": frames,
@@ -185,6 +215,10 @@ func _finish() -> void:
         "frame_interval_ms_p99": _percentile(_frames_ms, 0.99),
         "frame_interval_ms_p999": _percentile(_frames_ms, 0.999),
         "frame_interval_ms_max": _worst_interval_ms,
+        "viewport_render_cpu_p99_ms": _percentile(_render_cpu_ms, 0.99),
+        "viewport_render_gpu_p99_ms": _percentile(_render_gpu_ms, 0.99),
+        "viewport_render_cpu_samples": _render_cpu_ms.size(),
+        "viewport_render_gpu_samples": _render_gpu_ms.size(),
         "frames_interval_over_16_7_ms": _over_16_7,
         "frames_interval_over_20_ms": _over_20,
         "frames_interval_over_33_ms": _over_33,

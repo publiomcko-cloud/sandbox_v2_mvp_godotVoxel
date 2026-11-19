@@ -29,52 +29,13 @@ if (-not $SkipDownload) {
 }
 if (-not (Test-Path $editor)) { throw "Missing editor: $editor" }
 
-# Self-hosted runners are not guaranteed to have Git on PATH. GitHub's
-# checkout action can also fall back to a source archive, so do the same here.
-# Both acquisition paths are restricted to the exact 40-hex lockfile revision.
+# GitHub Actions checkout can fall back to a source archive when Git is absent.
+# Fetch godot-cpp at its exact locked SHA through the same GitHub source endpoint.
 $commit = [string]$lock.godot_cpp.commit
-if ($commit -notmatch '^[0-9a-f]{40}
-
-Write-Host 'Generating extension_api.json from the locked custom engine...'
-$probe = Join-Path $toolsDir 'api-probe'
-New-Item -ItemType Directory -Force $probe | Out-Null
-Set-Content -LiteralPath (Join-Path $probe 'project.godot') -Value 'config_version=5' -Encoding UTF8
-Push-Location $probe
-try {
-    Write-Host "Godot API probe directory: $(Get-Location)"
-    # Windows GUI-subsystem executables may return to PowerShell before the process exits.
-    $dump = Start-Process -FilePath $editor -ArgumentList @('--headless', '--editor', '--path', ('"' + $probe + '"'), '--dump-extension-api') -Wait -PassThru -NoNewWindow
-    if ($dump.ExitCode -ne 0) { throw "Godot --dump-extension-api failed: exit=$($dump.ExitCode)" }
-} finally { Pop-Location }
-# Search only the generated probe and binary paths, never the godot-cpp bundled vanilla API.
-$candidates = @(
-    (Join-Path $probe 'extension_api.json'),
-    (Join-Path $toolsDir 'extension_api.json'),
-    (Join-Path $root 'extension_api.json'),
-    (Join-Path $root 'godot/extension_api.json')
-)
-Write-Host "API probe files:"
-Get-ChildItem -LiteralPath $probe -Force -File | ForEach-Object { Write-Host $_.FullName }
-$foundApi = $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $foundApi) { throw "Custom Godot API missing: $($candidates -join '; ')" }
-$api = Join-Path $root 'extension_api.json'
-if ($foundApi -ne $api) { Copy-Item -LiteralPath $foundApi -Destination $api -Force }
-Write-Host "Found custom API: $foundApi"
-$apiData = Get-Content $api -Raw | ConvertFrom-Json
-if (-not ($apiData.classes | Where-Object { $_.name -eq 'VoxelLodTerrain' })) {
-    throw 'Custom Godot API contains no VoxelLodTerrain; wrong engine binary'
-}
-
-Write-Host "Building native GDExtension ($Target)..."
-& scons -C (Join-Path $root 'native') 'platform=windows' "target=$Target" "custom_api_file=$api" '-j4'
-if ($LASTEXITCODE -ne 0) { throw "SCons failed: exit $LASTEXITCODE" }
-$dll = Join-Path $root "godot/bin/sandbox_native.windows.$Target.x86_64.dll"
-if (-not (Test-Path $dll)) { throw "Expected GDExtension DLL missing: $dll" }
-Write-Host "A0_BUILD_PASS: $dll"
-) { throw "Invalid locked godot-cpp commit: $commit" }
-$gitExe = Get-Command git.exe -ErrorAction SilentlyContinue
+if ($commit -notmatch '^[0-9a-f]{40}$') { throw "Invalid godot-cpp SHA: $commit" }
+$gitExe = Get-Command 'git.exe' -ErrorAction SilentlyContinue
 if ($null -ne $gitExe) {
-    Write-Host "Retrieving pinned godot-cpp via Git: $commit"
+    Write-Host "Fetching locked godot-cpp revision through Git: $commit"
     if (-not (Test-Path (Join-Path $cppDir '.git'))) {
         if (Test-Path $cppDir) { Remove-Item -LiteralPath $cppDir -Recurse -Force }
         New-Item -ItemType Directory -Force $cppDir | Out-Null
@@ -84,28 +45,27 @@ if ($null -ne $gitExe) {
         if ($LASTEXITCODE -ne 0) { throw 'git remote add failed' }
     }
     & $gitExe.Source -C $cppDir fetch --depth 1 origin $commit
-    if ($LASTEXITCODE -ne 0) { throw 'git fetch godot-cpp failed' }
+    if ($LASTEXITCODE -ne 0) { throw 'git fetch failed' }
     & $gitExe.Source -C $cppDir checkout --detach --force FETCH_HEAD
-    if ($LASTEXITCODE -ne 0) { throw 'git checkout godot-cpp failed' }
+    if ($LASTEXITCODE -ne 0) { throw 'git checkout failed' }
     $actualCommit = (& $gitExe.Source -C $cppDir rev-parse HEAD).Trim()
     if ($actualCommit -ne $commit) { throw "godot-cpp commit mismatch: $actualCommit" }
 } else {
-    Write-Host "Git unavailable; downloading commit-pinned godot-cpp source archive: $commit"
-    $cppZip = Join-Path $toolsDir 'godot-cpp-source.zip'
-    $cppUnpack = Join-Path $toolsDir 'godot-cpp-source'
-    $cppUrl = "https://github.com/godotengine/godot-cpp/archive/$commit.zip"
-    Invoke-WebRequest -Uri $cppUrl -OutFile $cppZip -UseBasicParsing
-    if (Test-Path $cppUnpack) { Remove-Item -LiteralPath $cppUnpack -Recurse -Force }
-    New-Item -ItemType Directory -Force $cppUnpack | Out-Null
-    Expand-Archive -LiteralPath $cppZip -DestinationPath $cppUnpack -Force
-    $extracted = Join-Path $cppUnpack "godot-cpp-$commit"
-    if (-not (Test-Path (Join-Path $extracted 'SConstruct'))) {
-        throw "Locked godot-cpp archive missing SConstruct: $extracted"
+    Write-Host "Git is not installed; obtaining pinned source archive: $commit"
+    $sourceZip = Join-Path $toolsDir 'godot-cpp-source.zip'
+    $sourceExtract = Join-Path $toolsDir 'godot-cpp-extract'
+    $url = "https://github.com/godotengine/godot-cpp/archive/$commit.zip"
+    Invoke-WebRequest -Uri $url -OutFile $sourceZip -UseBasicParsing
+    if (Test-Path $sourceExtract) { Remove-Item -LiteralPath $sourceExtract -Force -Recurse }
+    New-Item -ItemType Directory -Force $sourceExtract | Out-Null
+    Expand-Archive -LiteralPath $sourceZip -DestinationPath $sourceExtract -Force
+    $sourceRoot = Join-Path $sourceExtract "godot-cpp-$commit"
+    if (-not (Test-Path (Join-Path $sourceRoot 'SConstruct'))) {
+        throw "Pinned godot-cpp archive missing SConstruct: $sourceRoot"
     }
-    if (Test-Path $cppDir) { Remove-Item -LiteralPath $cppDir -Recurse -Force }
-    Copy-Item -LiteralPath $extracted -Destination $cppDir -Recurse -Force
-    Set-Content -LiteralPath (Join-Path $cppDir '.a0-source-commit') -Value $commit -NoNewline
-    Write-Host "Using godot-cpp archive pinned to $commit"
+    if (Test-Path $cppDir) { Remove-Item -LiteralPath $cppDir -Force -Recurse }
+    Copy-Item -LiteralPath $sourceRoot -Destination $cppDir -Recurse -Force
+    Write-Host "Unpacked pinned godot-cpp source: $commit"
 }
 
 Write-Host 'Generating extension_api.json from the locked custom engine...'

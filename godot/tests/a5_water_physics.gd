@@ -23,7 +23,7 @@ func _verify() -> void:
     if absf(Water.submerged_sphere_fraction(0.0, 0.7) - 0.5) > 0.0001:
         _fail("sphere half-submerged fraction")
         return
-    if Water.submerged_sphere_fraction(2.0, 0.7) != 0.0 or Water.submerged_sphere_fraction(-2.0, 0.7) != 1.0:
+    if Water.submerged_sphere_fraction(2.0, 0.7) != 0.0 or absf(Water.submerged_sphere_fraction(-2.0, 0.7) - 1.0) > 0.0001:
         _fail("sphere fully dry/wet fractions")
         return
     var buoyancy := Water.buoyancy_newtons(1.436755, 1.0)

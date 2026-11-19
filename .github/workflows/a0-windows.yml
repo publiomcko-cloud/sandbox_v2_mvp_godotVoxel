@@ -72,7 +72,7 @@ jobs:
           Write-Host "A3_MSVC_AVAILABLE: $install"
       - name: Fetch pinned engine, generate custom API, compile A3 native code
         shell: powershell
-        run: ./scripts/bootstrap-windows.ps1 -RuntimeOnly
+        run: ./scripts/bootstrap-windows.ps1
       - name: Headless module and GDExtension smoke
         shell: powershell
         run: ./scripts/smoke-windows.ps1

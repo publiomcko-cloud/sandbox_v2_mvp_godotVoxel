@@ -13,6 +13,7 @@ MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 in
 - [A3: edição C++, SQLite e teste de reabertura](docs/A3_IMPLEMENTACAO.md)
 - [A4: rochas em MultiMesh, promoção para RigidBody e estado persistido](docs/A4_IMPLEMENTACAO.md)
 - [A5: oceano y=0, empuxo, arrasto, corrente e nado](docs/A5_IMPLEMENTACAO.md)
+- [A6: comparação CPU/GPU Vulkan com blocos 16/32](docs/A6_IMPLEMENTACAO.md)
 
 ## A0 Windows (PowerShell)
 Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
@@ -63,3 +64,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a5-smoke-windows.p
 \`\`\`
 
 \`reports/generated/a5-ci\` contém testes de física e de geometria/edição. O CI headless verifica fórmulas, forças, colisão em fixture e correspondência do nível nominal y=0, não pixels, continuidade 130m nem p99 GPU/present.
+
+
+## A6 — perfis CPU/GPU Vulkan e tamanho de bloco
+
+Checkpoint A5 preservado em \`checkpoint/a5-functional-20261119\`. Os perfis \`cpu16\`, \`gpu16\`, \`cpu32\` e \`gpu32\` não mudam seed, recursos, física, água, visão 192m ou LOD de 48m. **Todos os perfis gráficos rodam com Forward+ Vulkan**, incluindo CPU, sem confundir mudança de renderer com ganho do compute. O jogo padrão permanece A5/OpenGL.
+
+\`\`\`powershell
+# Diagnóstico individual; exige Vulkan e sessão gráfica:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a6-run-windows.ps1 -Profile cpu16 -Duration 30 -Warmup 45
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a6-run-windows.ps1 -Profile gpu16 -Duration 30 -Warmup 45
+
+# Campanha: 4 perfis x 3 repetições, rota de ida/volta 300s:
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a6-run-windows.ps1 -Campaign -Repeats 3 -Route out_and_back_18mps_300s -Duration 300 -Warmup 45
+\`\`\`
+
+Relatórios em \`reports/generated/a6/\`; envie os \`.json\` e \`.jsonl\` para avaliação de p99, filas e buffers. O CI testa configuração CPU16/CPU32 *headless*, não qualifica GPU nem apresentação visual. O comparador \`scripts/a6_compare.py\` **nunca promove** candidatos automaticamente. Consulte \`docs/A6_IMPLEMENTACAO.md\`.

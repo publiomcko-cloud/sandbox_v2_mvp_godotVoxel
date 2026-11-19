@@ -38,7 +38,7 @@ Arquivos por execução: \`reports/generated/a6/experiment-.../{cpu16,gpu16,cpu3
 \`\`\`powershell
 python .\scripts\a6_compare.py .\reports\generated\a6\experiment-YYYYMMDD-HHMMSS-PID
 \`\`\`
-O comparador nunca aprova automaticamente uma otimização. A coleta inclui A2 frame-start intervals p50/p95/p99/p99,9/máximo, contadores de fila, bloco e VRAM interna do VoxelEngine, e medidas CPU/GPU por viewport com instrumentação idêntica. **Tempos da viewport não são latência total CPU+GPU+present.** Frames do SO, stutter gráfico e render real precisam de inspeção e captura externa apropriada.
+O comparador nunca aprova automaticamente uma otimização. A coleta inclui A2 frame-start intervals p50/p95/p99/p99,9/máximo, contadores de fila, bloco e pools de memória de voxels do VoxelEngine (não VRAM da placa), e medidas CPU/GPU por viewport com instrumentação idêntica. **Tempos da viewport não são latência total CPU+GPU+present.** Frames do SO, stutter gráfico e render real precisam de inspeção e captura externa apropriada.
 
 Para capturas PNG, execute um braço *isoladamente* com \`-Capture\`; o overhead é diferente e esses runs nunca devem entrar na comparação de performance.
 

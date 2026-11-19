@@ -47,17 +47,18 @@ func _verify() -> void:
     if packed == null:
         _fail("scene failed to load")
         return
-    var world: Node3D = packed.instantiate()
+    var world := packed.instantiate()
     root.add_child(world)
     await process_frame
-    var terrain: VoxelLodTerrain = world.get_node("Terrain")
-    if not terrain.graph_ready or not terrain.generator is VoxelGeneratorGraph:
+    var terrain := world.get_node("Terrain")
+    if not terrain.get("graph_ready") or not (terrain.get("generator") is VoxelGeneratorGraph):
         _fail("main scene did not initialize A1 graph")
         return
-    if terrain.lod_count != 4 or terrain.mesh_block_size != 16 or terrain.view_distance < 160:
+    if terrain.get("lod_count") != 4 or terrain.get("mesh_block_size") != 16 or terrain.get("view_distance") < 160:
         _fail("LOD or requested horizon configuration drifted")
         return
+    var requested_distance = terrain.get("view_distance")
     world.queue_free()
     print("A1_GRAPH_PASS seed=", SEED, " tunnel_sdf=", inside_cave, " solid_sdf=", solid)
-    print("A1_HORIZON_CONFIG_PASS requested_view_distance=", terrain.view_distance, " (NOT pixel-verified)")
+    print("A1_HORIZON_CONFIG_PASS requested_view_distance=", requested_distance, " (NOT pixel-verified)")
     quit(0)

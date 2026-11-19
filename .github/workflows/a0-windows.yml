@@ -1,4 +1,4 @@
-name: A0/A1/A2/A3 Windows native build and persistence smoke
+name: A0-A4 Windows integration and rock physics smoke
 on:
   push:
     branches: [main]
@@ -62,17 +62,19 @@ jobs:
       - name: Static A3 native edit and SQLite contract
         shell: powershell
         run: python tests/check_a3_contract.py
-      - name: Validate native C++ toolchain before build
+      - name: A4 static and native A3 ABI parity
         shell: powershell
-        run: |
-          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-          if (-not (Test-Path $vswhere)) { throw 'A3_NATIVE_TOOLCHAIN_UNAVAILABLE: Visual Studio installer/vswhere absent' }
-          $install = (& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
-          if (-not $install) { throw 'A3_NATIVE_TOOLCHAIN_UNAVAILABLE: MSVC x64 Build Tools not installed on this runner' }
-          Write-Host "A3_MSVC_AVAILABLE: $install"
-      - name: Fetch pinned engine, generate custom API, compile A3 native code
+        run: python tests/check_a4_contract.py
+      - name: Restore compiled native binary from approved A3 CI
+        uses: actions/download-artifact@v4
+        with:
+          name: a0-build-snapshot
+          run-id: 44522153759
+          github-token: ${{ github.token }}
+          path: .
+      - name: Verify locked Godot and A3 native DLL without C++ rebuild
         shell: powershell
-        run: ./scripts/bootstrap-windows.ps1
+        run: ./scripts/bootstrap-windows.ps1 -RuntimeOnly
       - name: Headless module and GDExtension smoke
         shell: powershell
         run: ./scripts/smoke-windows.ps1
@@ -85,6 +87,9 @@ jobs:
       - name: A3 native edit and SQLite reopen smoke
         shell: powershell
         run: ./scripts/a3-smoke-windows.ps1
+      - name: A4 batched instancing, physics fixture and persistence reopen
+        shell: powershell
+        run: ./scripts/a4-smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -97,3 +102,4 @@ jobs:
             reports/generated/a2-ci/*.json
             reports/generated/a2-ci/*.jsonl
             reports/generated/a3-ci/*.json
+            reports/generated/a4-ci/*.json

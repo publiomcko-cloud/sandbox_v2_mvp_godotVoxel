@@ -11,5 +11,5 @@ func _ready() -> void:
     var manager := get_tree().get_first_node_in_group("a4_rock_manager")
     if manager != null:
         manager.register_body(self)
-    else:
+    elif not OS.get_cmdline_user_args().has("--a4-standalone-physics"):
         push_error("A4_BODY_ORPHAN: no rock manager")

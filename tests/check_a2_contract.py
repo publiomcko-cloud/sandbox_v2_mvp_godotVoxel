@@ -38,7 +38,9 @@ tracked_cpp = {p for p in current_native_files if
                p == "native/SConstruct" or p.startswith("native/src/")}
 assert tracked_cpp == set(a1_native_blobs), f"Native source set changed: {tracked_cpp}"
 for name, expected_blob in a1_native_blobs.items():
-    content = (root / name).read_bytes()
+    # Windows checkout may materialize CRLF; compare the normalized
+    # repository text, not platform-specific working-tree line endings.
+    content = (root / name).read_bytes().replace(b"\r\n", b"\n")
     blob = hashlib.sha1(b"blob " + str(len(content)).encode("ascii") + b"\0" + content).hexdigest()
     assert blob == expected_blob, f"A2 native drift: {name}"
 print("A2_NATIVE_A1_SNAPSHOT_PARITY_PASS")

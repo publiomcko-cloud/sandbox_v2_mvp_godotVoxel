@@ -1,45 +1,24 @@
 # Sandbox V2 — MVP A | Godot + Voxel Tools + C++
 
-**Estado:** especificação inicial; implementação, build e benchmarks ainda não iniciados.
+**Estado:** A0 bootstrap em implementação; nenhuma meta de desempenho qualificada.
 
-## Objetivo
+MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 integrado e lógica nativa em C++20. Meta final: 60 FPS/16,7 ms por frame completo, movimento contínuo de 18 m/s sem lacunas, raio visual efetivo de 130 m em 360°, edição visível <=100 ms, rochas físicas, água básica e persistência.
 
-Validar do zero um sandbox 3D com terreno volumétrico SDF editável, cavernas, streaming contínuo, LOD, rochas procedurais com física básica e água com empuxo/arrasto. Este repositório é independente de projetos anteriores: nenhuma base de código é herdada.
-
-## Stack proposta
-
-- Godot 4.7.2 e Voxel Tools 1.7 (build nativa reproduzível, versões/commits fixados na implementação).
-- C++20 para controladores e integração nativa; física Jolt e recursos de terreno/LOD do Voxel Tools.
-- Windows como plataforma inicial de qualificação; benchmarks com renderização gráfica real.
-
-## Aceite obrigatório
-
-| Métrica | Requisito |
-| --- | --- |
-| Frame completo | 60 FPS; orçamento de até **16,7 ms por frame** |
-| Deslocamento | **18 m/s** contínuos, sem regiões desaparecendo ou piscando |
-| Horizonte visual | **130 m de raio**, 360°, com LOD, terreno, rochas e água |
-| Edição | **até 100 ms**, do comando ao frame que apresenta a alteração |
-| Física | Colisões, gravidade e atrito de rochas; empuxo/arrasto e interação com água |
-| Persistência | Restaurar terreno editado e estados alterados dos objetos |
-
-Não basta medir geração headless: a aprovação depende de percurso automatizado, métricas de CPU/GPU e inspeção visual em 1080p.
-
-## Documentação
-
+## Documentos
 - [Especificação técnica do MVP A](docs/MVP_A_GODOT_VOXEL_TOOLS_CPP.md)
 - [Contrato comum de requisitos e benchmarks](docs/CRITERIOS_COMUNS.md)
+- [A0: bootstrap, execução e gates](docs/A0_IMPLEMENTACAO.md)
 
-## Sequência inicial
+## A0 Windows (PowerShell)
+Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
+```powershell
+py -3.12 -m pip install scons==4.10.0
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap-windows.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\smoke-windows.ps1
+& .\.tools\godot.exe --path .\godot --editor
+```
+O bootstrap usa o editor Godot+Voxel Tools oficial do release v1.7, confere SHA-256, baixa `godot-cpp` em commit fixo, gera `extension_api.json` no editor **customizado** e compila `native/` contra esta API. CI inclui verificação estática e smoke headless; **não** classifica teste headless como 60 FPS gráfico.
 
-1. Fixar dependências exatas e demonstrar compilação limpa da engine e extensão C++.
-2. Criar o mundo SDF determinístico, cavidades, LOD e cobertura inicial.
-3. Integrar edição local, colisão, rochas dinâmicas, água e persistência.
-4. Automatizar percursos frios/quentes, editar durante movimento e medir frames apresentados.
-5. Corrigir somente gargalos reproduzidos por evidências; registrar resultados e limites.
+A cena temporária tem terreno plano `VoxelLodTerrain`, mesher Transvoxel e um `VoxelViewer`; W/A/S/D e E/Q movem câmera livre a 18 m/s sem física. É apenas o primeiro teste de integração. Relevo SDF, cavernas e horizonte completo pertencem à A1.
 
-**Regra de continuidade:** manter geometria válida visível até a substituta estar pronta; não criar um segundo sistema concorrente de terreno ou desmontar regiões antes de concluir os novos recursos. Descarga e publicação devem ser limitadas por orçamento, sem bloquear o frame.
-
-## Execução
-
-Ainda não há executável ou comandos de build validados. Eles serão documentados após a primeira compilação reproduzível.
+Princípios: um único sistema de terreno/LOD, geometria válida retida até substituição, recursos não antecipam terreno, tarefas e publicação limitadas por orçamento e qualificações por benchmark gráfico real. Ver detalhes nos documentos de arquitetura.

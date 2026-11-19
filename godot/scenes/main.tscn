@@ -1,0 +1,48 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/viewer_motion.gd" id="1_motion"]
+
+[sub_resource type="VoxelGeneratorFlat" id="VoxelGeneratorFlat_ground"]
+height = 0.0
+
+[sub_resource type="VoxelMesherTransvoxel" id="VoxelMesherTransvoxel_ground"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
+albedo_color = Color(0.36, 0.57, 0.32, 1)
+roughness = 1.0
+
+[sub_resource type="Environment" id="Environment_day"]
+background_mode = 2
+background_color = Color(0.55, 0.72, 0.89, 1)
+ambient_light_source = 2
+
+[node name="World" type="WorldBootstrap"]
+
+[node name="Terrain" type="VoxelLodTerrain" parent="."]
+generator = SubResource("VoxelGeneratorFlat_ground")
+mesher = SubResource("VoxelMesherTransvoxel_ground")
+material = SubResource("StandardMaterial3D_ground")
+lod_count = 4
+mesh_block_size = 16
+view_distance = 128
+generate_collisions = false
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+rotation_degrees = Vector3(-55, -25, 0)
+light_energy = 1.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_day")
+
+[node name="Player" type="Node3D" parent="."]
+position = Vector3(0, 6, 12)
+script = ExtResource("1_motion")
+
+[node name="Camera3D" type="Camera3D" parent="Player"]
+rotation_degrees = Vector3(-22, 0, 0)
+current = true
+far = 250.0
+
+[node name="VoxelViewer" type="VoxelViewer" parent="Player"]
+view_distance = 96
+requires_collisions = false

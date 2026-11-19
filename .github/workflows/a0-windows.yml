@@ -1,0 +1,68 @@
+name: A0 Windows build and voxel API smoke
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: a0-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: [self-hosted, Windows, X64]
+    # Process-scoped policy; no persistent changes to the Windows runner.
+    env:
+      PSExecutionPolicyPreference: Bypass
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv (no machine-wide Python install)
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.13.9"
+          enable-cache: false
+      - name: Install workspace-local Python and SCons
+        shell: powershell
+        run: |
+          uv python install 3.12
+          if ($LASTEXITCODE -ne 0) { throw 'uv python install failed' }
+          uv venv .venv --python 3.12
+          if ($LASTEXITCODE -ne 0) { throw 'uv venv failed' }
+          uv pip install --python .venv/Scripts/python.exe scons==4.10.0
+          if ($LASTEXITCODE -ne 0) { throw 'uv pip install scons failed' }
+          $scripts = (Resolve-Path .venv/Scripts).Path
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $scripts
+          & .venv/Scripts/python.exe --version
+          & .venv/Scripts/scons.exe --version
+      - name: Configure persistent SCons cache
+        shell: powershell
+        run: |
+          if (-not $env:RUNNER_TOOL_CACHE) { throw 'RUNNER_TOOL_CACHE is not set' }
+          $cache = Join-Path $env:RUNNER_TOOL_CACHE 'sandbox-voxel-a0-scons-cache'
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+          "SCONS_CACHE=$cache" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "SCONS_CACHE=$cache"
+      - name: Static A0 contract validation
+        shell: powershell
+        run: python tests/check_a0_contract.py
+      - name: Fetch pinned engine, generate custom API, compile native code
+        shell: powershell
+        run: |
+          ./scripts/bootstrap-windows.ps1
+      - name: Headless module and GDExtension smoke
+        shell: powershell
+        run: ./scripts/smoke-windows.ps1
+      - name: Publish bootstrap build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: a0-build-snapshot
+          if-no-files-found: ignore
+          path: |
+            godot/bin/*.dll
+            extension_api.json

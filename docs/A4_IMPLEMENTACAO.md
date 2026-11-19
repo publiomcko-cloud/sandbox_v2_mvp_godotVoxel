@@ -35,3 +35,7 @@ A mesma DLL C++ da A3 é reutilizada. O CI verifica hashes Git dos arquivos nati
 
 ## Corretiva A4-ID
 O primeiro CI da A4 retornou status success, mas a auditoria explícita detectou dezenas de registros \`A4_DUPLICATE_PREVENTED id=x0_y0_z0\`: o motor inicializou a raiz \`RigidBody3D\` da removal_scene em posição zero, perdendo a transformação recebida. Corrigido com \`rock_spawn.tscn\` de raiz \`Node3D\`; a identidade é capturada antes da criação do corpo físico. O smoke passou a exigir contagem consistente de estáticas removidas e de corpos promovidos, IDs únicos e posições dentro do raio original. Nunca aceitar somente exit-code/CI verde sem auditar o log de erros.
+
+
+## Corretiva A4-CALLBACK
+A cena \`rock_spawn.tscn\` com raiz \`Node3D\` também recebeu posição zero em múltiplas remoções. A rota foi substituída por \`VoxelInstanceLibraryMultiMeshItem.REMOVAL_BEHAVIOR_CALLBACK\`, cuja assinatura entrega o \`Transform3D\` original por valor antes de qualquer cena existir. O callback agenda a construção do corpo no \`RockManager\` após a operação nativa. Logs registram os primeiros transforms recebidos. Se estes também forem zero, a falha está dentro do caminho do VoxelInstancer e o gate deve falhar, sem disfarçar removidos como corpos criados.

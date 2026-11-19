@@ -42,6 +42,24 @@ func _ready() -> void:
     _restore_states()
     print("A4_MANAGER_READY state_path=", _save_path, " restored=", _restored)
 
+func spawn_promoted(world_transform: Transform3D) -> void:
+    var p := world_transform.origin
+    if not p.is_finite():
+        push_error("A4_PROMOTION_BAD_TRANSFORM: nonfinite original position")
+        return
+    var id := "x%d_y%d_z%d" % [
+        roundi(p.x * 100.0), roundi(p.y * 100.0), roundi(p.z * 100.0)
+    ]
+    if _bodies.has(id):
+        push_error("A4_PROMOTION_COLLISION id=" + id + " original=" + str(p))
+        return
+    var body := ROCK_SCENE.instantiate() as RigidBody3D
+    body.set("rock_id", id)
+    body.set("restored_from_disk", false)
+    body.transform = global_transform.affine_inverse() * world_transform
+    add_child(body)
+    body.global_transform = world_transform
+
 func register_body(body: RigidBody3D) -> void:
     var id: String = body.get("rock_id")
     if id.is_empty():

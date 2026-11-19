@@ -2,6 +2,7 @@ extends VoxelInstancer
 # A4: Voxel Tools owns instance generation, batching, streaming, LOD and
 # removal. No second region manager or individually spawned distant rock nodes.
 const ROCK_LAYER_ID := 100
+const RockItem = preload("res://scripts/a4_rock_item.gd")
 const ROCK_DENSITY_PER_M2 := 0.016
 
 func _enter_tree() -> void:
@@ -30,7 +31,7 @@ func _enter_tree() -> void:
     stone.roughness = 1.0
     mesh.material = stone
 
-    var item := VoxelInstanceLibraryMultiMeshItem.new()
+    var item := RockItem.new()
     item.name = "a4_stone"
     item.mesh = mesh
     item.mesh_lod1 = mesh
@@ -41,8 +42,7 @@ func _enter_tree() -> void:
     item.lod_index = 2
     # Native VoxelStreamSQLite records removals; modified blocks don't respawn.
     item.persistent = true
-    item.removal_behavior = VoxelInstanceLibraryMultiMeshItem.REMOVAL_BEHAVIOR_INSTANTIATE
-    item.removal_scene = load("res://scenes/rock_spawn.tscn")
+    item.removal_behavior = VoxelInstanceLibraryMultiMeshItem.REMOVAL_BEHAVIOR_CALLBACK
     # No colliders for hundreds of MultiMesh instances. Physics is promoted.
     item.collision_distance = 0.0
 

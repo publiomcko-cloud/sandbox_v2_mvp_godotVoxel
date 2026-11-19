@@ -42,7 +42,7 @@ func _enter_tree() -> void:
     # Native VoxelStreamSQLite records removals; modified blocks don't respawn.
     item.persistent = true
     item.removal_behavior = VoxelInstanceLibraryMultiMeshItem.REMOVAL_BEHAVIOR_INSTANTIATE
-    item.removal_scene = load("res://scenes/rock_body.tscn")
+    item.removal_scene = load("res://scenes/rock_spawn.tscn")
     # No colliders for hundreds of MultiMesh instances. Physics is promoted.
     item.collision_distance = 0.0
 

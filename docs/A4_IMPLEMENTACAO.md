@@ -4,7 +4,7 @@
 
 ## Arquitetura
 - \`Terrain/RockInstancer\` é um \`VoxelInstancer\` nativo, filho do terreno. \`VoxelInstanceLibraryMultiMeshItem\`, ID fixo 100 e \`VoxelInstanceGenerator\` configuram densidade de ~0,016 rocha/m², altura e inclinação. Um \`SphereMesh\` low-poly evita assets externos. Geração, publicação e LOD continuam *exclusivamente* no Voxel Tools.
-- \`item.persistent=true\`: quando uma rocha é removida pelo instancer, sua retirada estática é associada ao \`VoxelStreamSQLite\`. A ferramenta nativa \`remove_instances_in_sphere\` dispara a ação \`REMOVAL_BEHAVIOR_INSTANTIATE\` para converter apenas as rochas atingidas em \`RigidBody3D\` com colisão de esfera simplificada, massa, atrito e gravidade.
+- \`item.persistent=true\`: quando uma rocha é removida pelo instancer, sua retirada estática é associada ao \`VoxelStreamSQLite\`. A ferramenta nativa \`remove_instances_in_sphere\` dispara a ação \`REMOVAL_BEHAVIOR_INSTANTIATE\` para converter apenas as rochas atingidas por meio de um wrapper \`Node3D\` que preserva o transform original e cria um \`RigidBody3D\` com colisão de esfera simplificada, massa, atrito e gravidade.
 - \`RockManager\` controla somente os corpos **já promovidos**, com ≤24 corpos ativos em física no raio de 24 m, congelamento além de 32 m. Não há malha individual por rocha distante nem outro gerenciador de regiões.
 - Os corpos promovidos têm ID por posição original quantizada em centímetros, proteção contra duplicatas e sidecar JSON por seed para posição, rotação, velocidades e estado de repouso. O sidecar é gravado temporariamente e renomeado; o VoxelStreamSQLite nativo continua responsável pelas alterações do terreno e pela marcação de instâncias estáticas removidas.
 - Input: pressione \`F\` mirando o chão junto de uma rocha (até 24 m); edição SDF da A3 e \`Ctrl+S\` preservados. Automático: sidecar de corpos a cada 5 s, salvamento SQLite sob Ctrl+S. Evitar desligamento forçado durante gravações.
@@ -31,3 +31,7 @@ A mesma DLL C++ da A3 é reutilizada. O CI verifica hashes Git dos arquivos nati
 2. O instancer fornece callback de remoção por esfera, não ID público de cada item antes da promoção. O ID é baseado no transform inicial quantizado; eventos em posições extremamente próximas precisam de revisão de colisão/duplicata.
 3. A conexão entre salvamento nativo de remoções e o sidecar JSON não forma uma transação única; queda/crash no meio dos dois saves exige reconciliação em uma fase futura. Não reivindicar atomicidade entre arquivos.
 4. Dinâmicas congeladas permanecem nos dados e podem ser reativadas, mas não voltam automaticamente à instância estática nativa. Isso evita reaparecimento duplicado, porém deve ser verificado sob trajetórias longas.
+
+
+## Corretiva A4-ID
+O primeiro CI da A4 retornou status success, mas a auditoria explícita detectou dezenas de registros \`A4_DUPLICATE_PREVENTED id=x0_y0_z0\`: o motor inicializou a raiz \`RigidBody3D\` da removal_scene em posição zero, perdendo a transformação recebida. Corrigido com \`rock_spawn.tscn\` de raiz \`Node3D\`; a identidade é capturada antes da criação do corpo físico. O smoke passou a exigir contagem consistente de estáticas removidas e de corpos promovidos, IDs únicos e posições dentro do raio original. Nunca aceitar somente exit-code/CI verde sem auditar o log de erros.

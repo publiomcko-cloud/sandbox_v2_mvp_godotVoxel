@@ -79,12 +79,32 @@ func _verify() -> void:
         if promoted <= 0:
             _fail("native promotion did not create RigidBody3D")
             return
+        # The original source-rock transform must survive removal_scene
+        # instantiation. A repeated origin (0,0,0) is a hard failure.
+        var identities: Dictionary = {}
+        for child in manager.get_children():
+            if not (child is RigidBody3D):
+                continue
+            var body_id := String(child.get("rock_id"))
+            if identities.has(body_id):
+                _fail("duplicated promoted identity: " + body_id)
+                return
+            identities[body_id] = true
+            if child.global_position.distance_to(TEST_AREA) > REMOVE_RADIUS + 4.0:
+                _fail("promoted body lost its source transform: " + str(child.global_position))
+                return
+        if identities.size() != promoted:
+            _fail("unregistered/missing promoted bodies: registered=%d children=%d" % [promoted, identities.size()])
+            return
         if int(manager.call("active_body_count")) > 24:
             _fail("dynamic body budget exceeded")
             return
         var after_count := int(instancer.debug_get_instance_counts().get(100, 0))
         if after_count >= static_count:
             _fail("static count did not decrease after promotion")
+            return
+        if promoted < static_count - after_count:
+            _fail("lost promoted bodies: removed=%d spawned=%d" % [static_count-after_count, promoted])
             return
         # Ensure no more dynamic bodies are created from exactly the same
         # selection; removed native instances must not be duplicated.

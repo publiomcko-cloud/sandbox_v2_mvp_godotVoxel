@@ -5,6 +5,7 @@ root=Path(__file__).resolve().parents[1]
 paths=[
     "godot/scripts/a4_rocks_instancer.gd","godot/scripts/a4_rock_manager.gd",
     "godot/scripts/a4_rock_body.gd","godot/scenes/rock_body.tscn",
+    "godot/scripts/a4_rock_spawn.gd","godot/scenes/rock_spawn.tscn",
     "godot/tests/a4_physics.gd","godot/tests/a4_smoke.gd",
     "scripts/a4-smoke-windows.ps1","docs/A4_IMPLEMENTACAO.md",
 ]
@@ -18,6 +19,7 @@ assert "VoxelInstanceLibraryMultiMeshItem.new()" in a
 assert "VoxelInstanceGenerator.new()" in a
 assert "item.persistent = true" in a
 assert "REMOVAL_BEHAVIOR_INSTANTIATE" in a
+assert "rock_spawn.tscn" in a
 assert "item.lod_index = 2" in a
 assert "remove_instances_in_sphere" in m
 assert "MAX_ACTIVE_BODIES := 24" in m

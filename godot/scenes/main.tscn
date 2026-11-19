@@ -1,7 +1,8 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/viewer_motion.gd" id="1_motion"]
 [ext_resource type="Script" path="res://scripts/terrain_sdf.gd" id="2_terrain"]
+[ext_resource type="Script" path="res://scripts/a3_edit_controller.gd" id="3_editor"]
 
 [sub_resource type="VoxelMesherTransvoxel" id="VoxelMesherTransvoxel_ground"]
 
@@ -25,7 +26,8 @@ lod_count = 4
 mesh_block_size = 16
 view_distance = 192
 lod_distance = 48.0
-generate_collisions = false
+generate_collisions = true
+collision_lod_count = 1
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
 rotation_degrees = Vector3(-55, -25, 0)
@@ -45,4 +47,16 @@ far = 320.0
 
 [node name="VoxelViewer" type="VoxelViewer" parent="Player"]
 view_distance = 192
-requires_collisions = false
+requires_collisions = true
+
+[node name="EditController" type="Node" parent="."]
+script = ExtResource("3_editor")
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="Status" type="Label" parent="HUD"]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 1200.0
+offset_bottom = 52.0
+text = "A3 edit controls"

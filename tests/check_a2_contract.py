@@ -22,25 +22,33 @@ assert "A2_OUTPUT_DIR" in runtime
 assert "VoxelLodTerrain" in (root / "godot/scenes/main.tscn").read_text(encoding="utf-8")
 print("A2_STATIC_PASS")
 
-# A2 reuses a specific successful A1 native DLL. Fail closed if ANY native
-# source changes, so the reused binary cannot silently drift from source.
-a1_native_blobs = {
-    "native/SConstruct": "1d17454e664e2f5f2b11aca89b764a4db3f95638",
-    "native/src/register_types.cpp": "1c33b0a691652aa91ec97c018ec2aceacc91f60a",
-    "native/src/world_bootstrap.cpp": "842ea913c6ed700967fc79c0b137f751d3e17cae",
-    "native/src/world_bootstrap.hpp": "6dc4f47883286ce05df0eeb7217053161e27a32b",
-}
-current_native_files = {p.relative_to(root).as_posix() for p in (root / "native").rglob("*")
-                        if p.is_file() and not p.name.startswith(".")}
-# Exclude generated/native build intermediates if present; only tracked
-# C++ files are under native/src and SConstruct.
-tracked_cpp = {p for p in current_native_files if
-               p == "native/SConstruct" or p.startswith("native/src/")}
-assert tracked_cpp == set(a1_native_blobs), f"Native source set changed: {tracked_cpp}"
-for name, expected_blob in a1_native_blobs.items():
-    # Windows checkout may materialize CRLF; compare the normalized
-    # repository text, not platform-specific working-tree line endings.
-    content = (root / name).read_bytes().replace(b"\r\n", b"\n")
-    blob = hashlib.sha1(b"blob " + str(len(content)).encode("ascii") + b"\0" + content).hexdigest()
-    assert blob == expected_blob, f"A2 native drift: {name}"
-print("A2_NATIVE_A1_SNAPSHOT_PARITY_PASS")
+# Enforce exact snapshot parity only for the A2 workflow that restores the
+# corresponding prebuilt native DLL. A3 explicitly recompiles C++ and is not
+# allowed to re-use the A1 snapshot.
+import os
+if os.environ.get("A2_REUSE_SNAPSHOT", "1") == "1":
+    # A2 reuses a specific successful A1 native DLL. Fail closed if ANY native
+    # source changes, so the reused binary cannot silently drift from source.
+    a1_native_blobs = {
+        "native/SConstruct": "1d17454e664e2f5f2b11aca89b764a4db3f95638",
+        "native/src/register_types.cpp": "1c33b0a691652aa91ec97c018ec2aceacc91f60a",
+        "native/src/world_bootstrap.cpp": "842ea913c6ed700967fc79c0b137f751d3e17cae",
+        "native/src/world_bootstrap.hpp": "6dc4f47883286ce05df0eeb7217053161e27a32b",
+    }
+    current_native_files = {p.relative_to(root).as_posix() for p in (root / "native").rglob("*")
+                            if p.is_file() and not p.name.startswith(".")}
+    # Exclude generated/native build intermediates if present; only tracked
+    # C++ files are under native/src and SConstruct.
+    tracked_cpp = {p for p in current_native_files if
+                   p == "native/SConstruct" or p.startswith("native/src/")}
+    assert tracked_cpp == set(a1_native_blobs), f"Native source set changed: {tracked_cpp}"
+    for name, expected_blob in a1_native_blobs.items():
+        # Windows checkout may materialize CRLF; compare the normalized
+        # repository text, not platform-specific working-tree line endings.
+        content = (root / name).read_bytes().replace(b"\r\n", b"\n")
+        blob = hashlib.sha1(b"blob " + str(len(content)).encode("ascii") + b"\0" + content).hexdigest()
+        assert blob == expected_blob, f"A2 native drift: {name}"
+    print("A2_NATIVE_A1_SNAPSHOT_PARITY_PASS")
+
+else:
+    print("A2_NATIVE_SNAPSHOT_NOT_USED: native compilation required by A3")

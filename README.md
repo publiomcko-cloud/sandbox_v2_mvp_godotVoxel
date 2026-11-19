@@ -10,6 +10,7 @@ MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 in
 - [A0: bootstrap, execução e gates](docs/A0_IMPLEMENTACAO.md)
 - [A1: mundo SDF, cavernas e LOD](docs/A1_IMPLEMENTACAO.md)
 - [A2: rotas determinísticas, streaming e telemetria](docs/A2_IMPLEMENTACAO.md)
+- [A3: edição C++, SQLite e teste de reabertura](docs/A3_IMPLEMENTACAO.md)
 
 ## A0 Windows (PowerShell)
 Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
@@ -33,3 +34,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a2-benchmark-windo
 \`\`\`
 
 JSONL e resumo aparecem em \`reports/generated/\`. Para capturas periódicas, inclua \`-Capture\`, em execução separada. A aprovação visual 18m/s e 130m efetivos ainda requer inspeção dos resultados.
+
+
+## A3 — edição nativa e persistência
+Novo C++ exige recompilação da GDExtension após mudar para a branch A3:
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\bootstrap-windows.ps1 -SkipDownload
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a3-smoke-windows.ps1
+& .\.tools\godot.exe --path .\godot
+\`\`\`
+No jogo, clique para capturar mouse, botão esquerdo remove terreno e direito adiciona; segure até 10Hz, Ctrl+S salva, Esc libera mouse. SQLite padrão: \`user://worlds/a3_v1_seed_20261119.sqlite\`. O smoke usa banco temporário isolado e verifica reabertura em novo processo. A edição aceita somente áreas LOD0 carregadas; falhas não executam brush parcial. **Latência até pixel realmente apresentado e colisão pós-edição ainda exigem qualificação gráfica.**

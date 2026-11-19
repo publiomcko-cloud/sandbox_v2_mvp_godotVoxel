@@ -18,7 +18,7 @@ func _process(delta: float) -> void:
     var motion := Vector3.ZERO
     if Input.is_key_pressed(KEY_W):
         motion.z -= 1.0
-    if Input.is_key_pressed(KEY_S):
+    if Input.is_key_pressed(KEY_S) and not Input.is_key_pressed(KEY_CTRL):
         motion.z += 1.0
     if Input.is_key_pressed(KEY_A):
         motion.x -= 1.0

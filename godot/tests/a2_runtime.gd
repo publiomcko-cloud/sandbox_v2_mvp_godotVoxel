@@ -69,6 +69,7 @@ func _ready() -> void:
            "rendering_method_actual": RenderingServer.get_current_rendering_method(),
            "rendering_driver_actual": RenderingServer.get_current_rendering_driver_name(),
            "hardware_cpu": OS.get_processor_name(),
+           "voxel_tools_version": VoxelEngine.get_version_v() if not a6_profile.is_empty() else Vector3i.ZERO,
            "seed": 20261119, "speed_mps": Routes.SPEED_MPS,
            "target_radius_m": 130, "requested_view_distance": _terrain.view_distance,
            "lod_count": _terrain.lod_count, "mesh_block_size": _terrain.mesh_block_size,
@@ -109,7 +110,8 @@ func _emit_progress(phase: String, t: float) -> void:
         "engine_fps": Engine.get_frames_per_second(),
         "process_cpu_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
         "physics_cpu_ms": Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
-        "a6_profile": a6_profile, "terrain_stats": st
+        "a6_profile": a6_profile, "terrain_stats": st,
+        "voxel_engine_stats": VoxelEngine.get_stats() if not a6_profile.is_empty() else {}
     }
     _emit(row)
     _samples_written += 1

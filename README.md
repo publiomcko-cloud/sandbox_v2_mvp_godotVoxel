@@ -11,6 +11,7 @@ MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 in
 - [A1: mundo SDF, cavernas e LOD](docs/A1_IMPLEMENTACAO.md)
 - [A2: rotas determinísticas, streaming e telemetria](docs/A2_IMPLEMENTACAO.md)
 - [A3: edição C++, SQLite e teste de reabertura](docs/A3_IMPLEMENTACAO.md)
+- [A4: rochas em MultiMesh, promoção para RigidBody e estado persistido](docs/A4_IMPLEMENTACAO.md)
 
 ## A0 Windows (PowerShell)
 Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
@@ -44,3 +45,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a3-smoke-windows.p
 & .\.tools\godot.exe --path .\godot
 \`\`\`
 No jogo, clique para capturar mouse, botão esquerdo remove terreno e direito adiciona; segure até 10Hz, Ctrl+S salva, Esc libera mouse. SQLite padrão: \`user://worlds/a3_v1_seed_20261119.sqlite\`. O smoke usa banco temporário isolado e verifica reabertura em novo processo. A edição aceita somente áreas LOD0 carregadas; falhas não executam brush parcial. **Latência até pixel realmente apresentado e colisão pós-edição ainda exigem qualificação gráfica.**
+
+
+## A4 — rochas físicas por promoção
+A4 parte do checkpoint A3 e mantém o mesmo C++/ABI (sem recompilação nativa). Usa \`VoxelInstancer\` + \`VoxelInstanceLibraryMultiMeshItem\` para renderizar rochas por LOD nativo e marca remoções como persistentes. Pressione **F** mirando o terreno junto a uma rocha (até 24 m) para promovê-la a \`RigidBody3D\`. No máximo 24 corpos ficam fisicamente ativos; os demais promovidos são congelados. \`Ctrl+S\` salva os estados dos corpos num JSON separado, associado à mesma seed; a remoção dos objetos estáticos é salva pelo \`VoxelStreamSQLite\` do terreno. Os relatórios headless verificam contagem de instâncias, física e reabertura, **não** pixels, 130 m efetivos, estabilidade visual ou desempenho.

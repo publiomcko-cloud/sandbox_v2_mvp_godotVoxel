@@ -12,6 +12,7 @@ MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 in
 - [A2: rotas determinísticas, streaming e telemetria](docs/A2_IMPLEMENTACAO.md)
 - [A3: edição C++, SQLite e teste de reabertura](docs/A3_IMPLEMENTACAO.md)
 - [A4: rochas em MultiMesh, promoção para RigidBody e estado persistido](docs/A4_IMPLEMENTACAO.md)
+- [A5: oceano y=0, empuxo, arrasto, corrente e nado](docs/A5_IMPLEMENTACAO.md)
 
 ## A0 Windows (PowerShell)
 Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
@@ -49,3 +50,16 @@ No jogo, clique para capturar mouse, botão esquerdo remove terreno e direito ad
 
 ## A4 — rochas físicas por promoção
 A4 parte do checkpoint A3 e mantém o mesmo C++/ABI (sem recompilação nativa). Usa \`VoxelInstancer\` + \`VoxelInstanceLibraryMultiMeshItem\` para renderizar rochas por LOD nativo e marca remoções como persistentes. Pressione **F** mirando o terreno junto a uma rocha (até 24 m) para promovê-la a \`RigidBody3D\`. No máximo 24 corpos ficam fisicamente ativos; os demais promovidos são congelados. \`Ctrl+S\` salva os estados dos corpos num JSON separado, associado à mesma seed; a remoção dos objetos estáticos é salva pelo \`VoxelStreamSQLite\` do terreno. Os relatórios headless verificam contagem de instâncias, física e reabertura, **não** pixels, 130 m efetivos, estabilidade visual ou desempenho.
+
+
+## A5 — água básica
+Uma única superfície transparente acompanha a câmera em y=0 (sem chunks, tiles ou lacunas de LOD). A costa é determinada pela oclusão geométrica do terreno; escavar abaixo da cota zero expõe a água imediatamente, sem remalhar a superfície aquática. \`Area3D\` de 128m de lado calcula empuxo e arrasto de no máximo 24 corpos físicos próximos; rochas de densidade > água afundam. Um canal com corrente prescrita ocupa a faixa \`z≈30 ±7m\`. A água não usa CFD.
+
+A câmera inicia no voo livre original a 18m/s. **G** alterna para \`CharacterBody3D\` (gravidade, colisão de terreno e nado quando imerso); E/Q controlam subida/descida na água. G novamente retorna ao voo original. Não prometer 18m/s *nadando*: o alvo de 18m/s é para movimento terrestre/livre; nado fica limitado a 7m/s. Edição A3, promoção A4 e \`Ctrl+S\` permanecem.
+
+\`\`\`powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a5-smoke-windows.ps1
+& .\.tools\godot.exe --path .\godot
+\`\`\`
+
+\`reports/generated/a5-ci\` contém testes de física e de geometria/edição. O CI headless verifica fórmulas, forças, colisão em fixture e correspondência do nível nominal y=0, não pixels, continuidade 130m nem p99 GPU/present.

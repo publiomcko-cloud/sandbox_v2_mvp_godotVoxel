@@ -8,6 +8,7 @@ var duration_sec: float = 0.0
 var warmup_sec: float = 45.0
 var ci_smoke: bool = false
 var capture_screenshots: bool = false
+var a6_profile: String = ""
 
 var _terrain: VoxelLodTerrain
 var _player: Node3D
@@ -64,6 +65,10 @@ func _ready() -> void:
           " duration_s=", duration_sec, " headless=", DisplayServer.get_name() == "headless")
     print("A2_JSONL=", path)
     _emit({"type": "metadata", "schema": "a2_v1", "route": route,
+           "a6_profile": a6_profile, "a6_gpu_requested": _terrain.use_gpu_generation,
+           "rendering_method_actual": RenderingServer.get_current_rendering_method(),
+           "rendering_driver_actual": RenderingServer.get_current_rendering_driver_name(),
+           "hardware_cpu": OS.get_processor_name(),
            "seed": 20261119, "speed_mps": Routes.SPEED_MPS,
            "target_radius_m": 130, "requested_view_distance": _terrain.view_distance,
            "lod_count": _terrain.lod_count, "mesh_block_size": _terrain.mesh_block_size,
@@ -104,7 +109,7 @@ func _emit_progress(phase: String, t: float) -> void:
         "engine_fps": Engine.get_frames_per_second(),
         "process_cpu_ms": Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
         "physics_cpu_ms": Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
-        "terrain_stats": st
+        "a6_profile": a6_profile, "terrain_stats": st
     }
     _emit(row)
     _samples_written += 1
@@ -177,6 +182,13 @@ func _finish() -> void:
     var frames := _frames_ms.size()
     var summary := {
         "schema": "a2_v1", "type": "summary", "route": route,
+        "a6_profile": a6_profile, "mesh_block_size": _terrain.mesh_block_size,
+        "lod_distance_m": _terrain.lod_distance,
+        "view_distance_m": _terrain.view_distance,
+        "a6_gpu_requested": _terrain.use_gpu_generation,
+        "rendering_method_actual": RenderingServer.get_current_rendering_method(),
+        "rendering_driver_actual": RenderingServer.get_current_rendering_driver_name(),
+        "hardware_cpu": OS.get_processor_name(),
         "seed": 20261119, "speed_mps": Routes.SPEED_MPS,
         "duration_sec": duration_sec, "warmup_sec": warmup_sec,
         "frame_intervals_observed": frames,

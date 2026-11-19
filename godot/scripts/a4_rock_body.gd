@@ -10,6 +10,6 @@ func _ready() -> void:
         rock_id = "x%d_y%d_z%d" % [roundi(p.x * 100.0), roundi(p.y * 100.0), roundi(p.z * 100.0)]
     var manager := get_tree().get_first_node_in_group("a4_rock_manager")
     if manager != null:
-        manager.register_body(self)
+        manager.call("register_body", self)
     elif not OS.get_cmdline_user_args().has("--a4-standalone-physics"):
         push_error("A4_BODY_ORPHAN: no rock manager")

@@ -73,13 +73,13 @@ func _verify() -> void:
     if phase == "write":
         instancer.remove_instances_in_sphere(instancer.to_local(TEST_AREA), REMOVE_RADIUS)
         var promotion_limit := Time.get_ticks_msec() + 10000
-        while manager.persisted_body_count() <= 0 and Time.get_ticks_msec() < promotion_limit:
+        while int(manager.call("persisted_body_count")) <= 0 and Time.get_ticks_msec() < promotion_limit:
             await process_frame
-        var promoted := manager.persisted_body_count()
+        var promoted := int(manager.call("persisted_body_count"))
         if promoted <= 0:
             _fail("native promotion did not create RigidBody3D")
             return
-        if manager.active_body_count() > 24:
+        if int(manager.call("active_body_count")) > 24:
             _fail("dynamic body budget exceeded")
             return
         var after_count := int(instancer.debug_get_instance_counts().get(100, 0))
@@ -91,7 +91,7 @@ func _verify() -> void:
         instancer.remove_instances_in_sphere(instancer.to_local(TEST_AREA), REMOVE_RADIUS)
         await process_frame
         await process_frame
-        if manager.persisted_body_count() != promoted:
+        if int(manager.call("persisted_body_count")) != promoted:
             _fail("same native rocks promoted twice")
             return
         var tracker: VoxelSaveCompletionTracker = terrain.save_modified_blocks()
@@ -108,7 +108,7 @@ func _verify() -> void:
             _fail("native save tracker aborted")
             return
         terrain.stream.flush()
-        if not manager.save_states():
+        if not bool(manager.call("save_states")):
             _fail("sidecar failed to write")
             return
         if not FileAccess.file_exists(OS.get_environment("A3_SAVE_PATH")) or not FileAccess.file_exists(OS.get_environment("A4_ROCK_STATE_PATH")):
@@ -118,16 +118,16 @@ func _verify() -> void:
             "static_count_before": static_count,
             "static_count_after": after_count,
             "promoted_count": promoted,
-            "active_count": manager.active_body_count(),
+            "active_count": int(manager.call("active_body_count")),
             "native_blocks": instancer.debug_get_block_count()
         })
         print("A4_PROMOTION_SAVE_PASS before=", static_count, " after=", after_count, " bodies=", promoted)
     else:
-        var loaded_bodies := manager.persisted_body_count()
-        if loaded_bodies <= 0 or loaded_bodies != int(manager.get_report().get("restored_bodies", 0)):
+        var loaded_bodies := int(manager.call("persisted_body_count"))
+        if loaded_bodies <= 0 or loaded_bodies != int(manager.call("get_report").get("restored_bodies", 0)):
             _fail("promoted bodies not restored from sidecar")
             return
-        if manager.active_body_count() > 24:
+        if int(manager.call("active_body_count")) > 24:
             _fail("body budget exceeded on reopen")
             return
         # On reopen, native VoxelStreamSQLite must still have instancing
@@ -135,7 +135,7 @@ func _verify() -> void:
         _report(phase, {
             "static_count_reopened": static_count,
             "promoted_count_reopened": loaded_bodies,
-            "active_count": manager.active_body_count(),
+            "active_count": int(manager.call("active_body_count")),
             "native_blocks": instancer.debug_get_block_count()
         })
         print("A4_REOPEN_PASS static=", static_count, " restored_bodies=", loaded_bodies)

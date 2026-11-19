@@ -156,7 +156,7 @@ func save_states() -> bool:
         return false
     f.store_string(JSON.stringify({
         "version": SAVE_VERSION,
-        "seed": int(terrain.world_seed),
+        "seed": int(terrain.get("world_seed")),
         "rocks": data
     }, "  "))
     f.flush()
@@ -181,7 +181,7 @@ func _restore_states() -> void:
         return
     var parsed = JSON.parse_string(f.get_as_text())
     f.close()
-    if not (parsed is Dictionary) or int(parsed.get("version", -1)) != SAVE_VERSION or int(parsed.get("seed", -1)) != int(terrain.world_seed):
+    if not (parsed is Dictionary) or int(parsed.get("version", -1)) != SAVE_VERSION or int(parsed.get("seed", -1)) != int(terrain.get("world_seed")):
         push_error("A4_RESTORE_FAIL: version or seed mismatch")
         return
     var entries: Array = parsed.get("rocks", [])

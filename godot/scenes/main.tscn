@@ -1,9 +1,7 @@
 [gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/viewer_motion.gd" id="1_motion"]
-
-[sub_resource type="VoxelGeneratorFlat" id="VoxelGeneratorFlat_ground"]
-height = 0.0
+[ext_resource type="Script" path="res://scripts/terrain_sdf.gd" id="2_terrain"]
 
 [sub_resource type="VoxelMesherTransvoxel" id="VoxelMesherTransvoxel_ground"]
 
@@ -19,12 +17,14 @@ ambient_light_source = 2
 [node name="World" type="WorldBootstrap"]
 
 [node name="Terrain" type="VoxelLodTerrain" parent="."]
-generator = SubResource("VoxelGeneratorFlat_ground")
+script = ExtResource("2_terrain")
+world_seed = 20261119
 mesher = SubResource("VoxelMesherTransvoxel_ground")
 material = SubResource("StandardMaterial3D_ground")
 lod_count = 4
 mesh_block_size = 16
-view_distance = 128
+view_distance = 192
+lod_distance = 48.0
 generate_collisions = false
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
@@ -35,14 +35,14 @@ light_energy = 1.0
 environment = SubResource("Environment_day")
 
 [node name="Player" type="Node3D" parent="."]
-position = Vector3(0, 6, 12)
+position = Vector3(0, 22, 18)
 script = ExtResource("1_motion")
 
 [node name="Camera3D" type="Camera3D" parent="Player"]
 rotation_degrees = Vector3(-22, 0, 0)
 current = true
-far = 250.0
+far = 320.0
 
 [node name="VoxelViewer" type="VoxelViewer" parent="Player"]
-view_distance = 96
+view_distance = 192
 requires_collisions = false

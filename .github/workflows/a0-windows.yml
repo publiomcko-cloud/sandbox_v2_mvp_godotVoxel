@@ -1,4 +1,4 @@
-name: A0 Windows build and voxel API smoke
+name: A0/A1 Windows native build and graph smoke
 on:
   push:
     branches: [main]
@@ -50,6 +50,9 @@ jobs:
       - name: Static A0 contract validation
         shell: powershell
         run: python tests/check_a0_contract.py
+      - name: Static A1 contract validation
+        shell: powershell
+        run: python tests/check_a1_contract.py
       - name: Fetch pinned engine, generate custom API, compile native code
         shell: powershell
         run: |
@@ -57,6 +60,9 @@ jobs:
       - name: Headless module and GDExtension smoke
         shell: powershell
         run: ./scripts/smoke-windows.ps1
+      - name: A1 deterministic SDF and scene smoke
+        shell: powershell
+        run: ./scripts/a1-smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4

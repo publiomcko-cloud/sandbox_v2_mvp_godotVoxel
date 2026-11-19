@@ -15,7 +15,8 @@ a=(root/"godot/scripts/a4_rocks_instancer.gd").read_text(encoding="utf-8")
 m=(root/"godot/scripts/a4_rock_manager.gd").read_text(encoding="utf-8")
 s=(root/"godot/scenes/main.tscn").read_text(encoding="utf-8")
 assert "extends VoxelInstancer" in a
-assert "VoxelInstanceLibraryMultiMeshItem.new()" in a
+assert "var item := RockItem.new()" in a
+assert "extends VoxelInstanceLibraryMultiMeshItem" in (root/"godot/scripts/a4_rock_item.gd").read_text(encoding="utf-8")
 assert "VoxelInstanceGenerator.new()" in a
 assert "item.persistent = true" in a
 assert "REMOVAL_BEHAVIOR_CALLBACK" in a

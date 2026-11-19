@@ -10,6 +10,21 @@ func _enter_tree() -> void:
         push_error("A1_GRAPH_FAIL: failed to build deterministic SDF")
         return
     generator = sdf_graph
+
+    # A3: only modified voxel blocks are written. Seed and format version are
+    # encoded in the default filename; tests supply an isolated A3_SAVE_PATH.
+    var db_path := OS.get_environment("A3_SAVE_PATH")
+    if db_path.is_empty():
+        db_path = "user://worlds/a3_v1_seed_%d.sqlite" % world_seed
+    var folder := db_path.get_base_dir()
+    if DirAccess.make_dir_recursive_absolute(folder) != OK:
+        push_error("A3_SQLITE_FAIL: cannot create save folder: " + folder)
+        return
+    var sqlite := VoxelStreamSQLite.new()
+    sqlite.database_path = db_path
+    sqlite.save_generator_output = false
+    stream = sqlite
+    print("A3_SQLITE_READY path=", db_path)
     graph_ready = true
     print("A1_TERRAIN_READY seed=", world_seed, " lod_count=", lod_count, " view_distance=", view_distance)
 

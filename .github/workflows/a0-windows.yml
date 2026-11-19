@@ -1,4 +1,4 @@
-name: A0/A1/A2 Windows native build and streaming smoke
+name: A0/A1/A2/A3 Windows native build and persistence smoke
 on:
   push:
     branches: [main]
@@ -56,17 +56,23 @@ jobs:
         run: python tests/check_a1_contract.py
       - name: Static A2 route and telemetry contract
         shell: powershell
+        env:
+          A2_REUSE_SNAPSHOT: "0"
         run: python tests/check_a2_contract.py
-      - name: Restore approved A1 native build artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: a0-build-snapshot
-          run-id: 44507482206
-          github-token: ${{ github.token }}
-          path: .
-      - name: Verify locked custom engine and approved A1 ABI (no native recompilation)
+      - name: Static A3 native edit and SQLite contract
         shell: powershell
-        run: ./scripts/bootstrap-windows.ps1 -RuntimeOnly
+        run: python tests/check_a3_contract.py
+      - name: Validate native C++ toolchain before build
+        shell: powershell
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (-not (Test-Path $vswhere)) { throw 'A3_NATIVE_TOOLCHAIN_UNAVAILABLE: Visual Studio installer/vswhere absent' }
+          $install = (& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath | Select-Object -First 1)
+          if (-not $install) { throw 'A3_NATIVE_TOOLCHAIN_UNAVAILABLE: MSVC x64 Build Tools not installed on this runner' }
+          Write-Host "A3_MSVC_AVAILABLE: $install"
+      - name: Fetch pinned engine, generate custom API, compile A3 native code
+        shell: powershell
+        run: ./scripts/bootstrap-windows.ps1
       - name: Headless module and GDExtension smoke
         shell: powershell
         run: ./scripts/smoke-windows.ps1
@@ -76,6 +82,9 @@ jobs:
       - name: A2 deterministic route and headless trace smoke
         shell: powershell
         run: ./scripts/a2-smoke-windows.ps1
+      - name: A3 native edit and SQLite reopen smoke
+        shell: powershell
+        run: ./scripts/a3-smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -87,3 +96,4 @@ jobs:
             extension_api.json
             reports/generated/a2-ci/*.json
             reports/generated/a2-ci/*.jsonl
+            reports/generated/a3-ci/*.json

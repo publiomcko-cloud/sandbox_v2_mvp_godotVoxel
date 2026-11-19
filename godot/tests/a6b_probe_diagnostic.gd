@@ -110,6 +110,49 @@ func _probe(terrain: VoxelLodTerrain, player_x: float) -> Dictionary:
         "frame_time_gate": "NOT_QUALIFIED"
     }
 
+func _short_sweep(terrain: VoxelLodTerrain, player: Node3D, center_x: float, heading: int) -> Dictionary:
+    # 0.6s at exactly 18m/s across 10.8m surrounding the critical x.
+    # Time-based positions are independent of actual framerate; this is a
+    # LOCAL moving probe test after a teleport, not a continuous 300s route.
+    var distance := 5.4
+    var from_x := center_x - float(heading) * distance
+    player.global_position = Vector3(from_x, 22.0, 18.0)
+    await process_frame
+    var started := Time.get_ticks_usec()
+    var nearest_distance := INF
+    var nearest_probe: Dictionary = {}
+    var center_samples := 0
+    var minimum_legacy_hits := 8
+    var worst_missing: Array = []
+    var t := 0.0
+    while t < 0.6:
+        t = minf(0.6, float(Time.get_ticks_usec() - started) / 1000000.0)
+        var position_x := from_x + float(heading) * 18.0 * t
+        player.global_position = Vector3(position_x, 22.0, 18.0)
+        var difference := absf(position_x - center_x)
+        if difference <= 1.0 or difference < nearest_distance:
+            var measured := _probe(terrain, position_x)
+            if difference < nearest_distance:
+                nearest_distance = difference
+                nearest_probe = measured
+            if difference <= 1.0:
+                center_samples += 1
+                var hits := int(measured["original_hits_8"])
+                if hits < minimum_legacy_hits:
+                    minimum_legacy_hits = hits
+                    worst_missing = measured["original_missing_directions"]
+        await process_frame
+    return {
+        "speed_mps": 18.0, "duration_s": 0.6,
+        "center_window_m": 1.0, "samples_near_center": center_samples,
+        "nearest_distance_m": nearest_distance,
+        "nearest_original_hits_8": nearest_probe.get("original_hits_8", -1),
+        "minimum_original_hits_near_center": minimum_legacy_hits,
+        "worst_missing_directions": worst_missing,
+        "nearest_probe": nearest_probe,
+        "full_route_18mps_gate": "NOT_QUALIFIED"
+    }
+
 func _capture_site(player: Node3D, folder: String, name: String, mesh32: bool) -> int:
     var screenshots := 0
     # Aim at cardinal probe directions, especially outward toward LOD edges.
@@ -183,6 +226,10 @@ func _verify() -> void:
         while Time.get_ticks_msec() < deadline:
             await process_frame
         var settled := _probe(terrain, x)
+        var sweep_result: Dictionary = await _short_sweep(terrain, player, x, int(site["direction"]))
+        # Keep image vantage point identical across cpu16 and cpu32.
+        player.global_position = Vector3(x, 22.0, 18.0)
+        await process_frame
         var count := 0
         if capture and not headless:
             count = await _capture_site(player, folder, String(site["name"]), profile.ends_with("32"))
@@ -191,6 +238,7 @@ func _verify() -> void:
             "original_t_s": site["t"],
             "player_x": x, "player_z": 18.0, "heading": site["direction"],
             "arrival": arrival, "settled": settled,
+            "short_18mps_sweep": sweep_result,
             "screen_images": count,
             "native_terrain_stats_at_settle": terrain.get_statistics(),
             "mesh_blocks_at_settle": terrain.debug_get_mesh_block_count()
@@ -199,7 +247,8 @@ func _verify() -> void:
               " arrival_hits=", arrival["original_hits_8"],
               " settled_hits=", settled["original_hits_8"],
               " boundary_missing=", settled["missing_directions_crossing_128m_grid"],
-              " split_covered=", settled["split_covered_but_original_failed"])
+              " split_covered=", settled["split_covered_but_original_failed"],
+              " moving_nearest_hits=", sweep_result["nearest_original_hits_8"])
     var document := {
         "schema": "a6b_probe_v1",
         "profile": profile, "mesh_block_size": terrain.mesh_block_size,

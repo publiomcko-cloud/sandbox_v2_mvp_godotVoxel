@@ -67,9 +67,8 @@ $hostInfo = @{
 
 for ($rep = 1; $rep -le $repetitions; $rep++) {
     # Reverse order every other repetition to reduce thermal/order bias.
-    $ordered = if ($Campaign -and ($rep % 2 -eq 0)) {
-        @($profiles | Select-Object -Reverse)
-    } else { $profiles }
+    $ordered = @($profiles)
+    if ($Campaign -and ($rep % 2 -eq 0)) { [array]::Reverse($ordered) }
     foreach ($variant in $ordered) {
         $destination = Join-Path $outputRoot ("{0}_rep{1:d2}" -f $variant,$rep)
         New-Item -ItemType Directory -Path $destination -Force | Out-Null

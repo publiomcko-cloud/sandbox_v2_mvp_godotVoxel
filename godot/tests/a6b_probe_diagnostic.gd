@@ -162,7 +162,7 @@ func _capture_site(player: Node3D, folder: String, name: String, mesh32: bool) -
         player.rotation.y = atan2(-v.x, -v.z)
         await process_frame
         await process_frame
-        var img := get_viewport().get_texture().get_image()
+        var img: Image = root.get_texture().get_image()
         if img == null or img.is_empty():
             push_error("A6B_CAPTURE_FAIL site=" + name + " dir=" + str(i))
             continue

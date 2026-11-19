@@ -39,3 +39,9 @@ O primeiro CI da A4 retornou status success, mas a auditoria explícita detectou
 
 ## Corretiva A4-CALLBACK
 A cena \`rock_spawn.tscn\` com raiz \`Node3D\` também recebeu posição zero em múltiplas remoções. A rota foi substituída por \`VoxelInstanceLibraryMultiMeshItem.REMOVAL_BEHAVIOR_CALLBACK\`, cuja assinatura entrega o \`Transform3D\` original por valor antes de qualquer cena existir. O callback agenda a construção do corpo no \`RockManager\` após a operação nativa. Logs registram os primeiros transforms recebidos. Se estes também forem zero, a falha está dentro do caminho do VoxelInstancer e o gate deve falhar, sem disfarçar removidos como corpos criados.
+
+
+## A4-HEADLESS-QUALIFICATION — limitação confirmada
+No Windows Actions com \`--headless\`, o \`VoxelInstancer\` reporta instâncias ativas, mas os callbacks de remoção (tanto \`REMOVAL_BEHAVIOR_INSTANTIATE\` quanto \`REMOVAL_BEHAVIOR_CALLBACK\`) recebem \`Transform3D\` com origem (0,0,0) para diversas rochas do mesmo bloco. Isso não pode ser usado como posição válida e gerava duplicatas falsas.
+
+No headless, a promoção a corpo físico é **suprimida** quando o motor não disponibiliza transforms da camada de renderização; o teste registra \`headless_native_transform_gate=NOT_QUALIFIED\`. O smoke agora separa: (1) remoção estática nativa e persistência SQLite; (2) corpos físicos criados a partir de **transforms de teste explícitos**, checando ID/cap/física/sidecar e reabertura em novo processo; (3) a ligação exata do transform nativo GPU/Multimesh → corpo físico deve ser testada em sessão gráfica real antes de aprovar A4. Não alegar que (1)+(2) comprovam (3). Cabe ao resultado gráfico decidir entre limitação do renderer headless e bug comum.

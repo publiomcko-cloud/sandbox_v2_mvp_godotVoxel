@@ -33,10 +33,11 @@ $write = Get-Content -LiteralPath (Join-Path $reports 'a4_write.json') -Raw | Co
 $reopen = Get-Content -LiteralPath (Join-Path $reports 'a4_reopen.json') -Raw | ConvertFrom-Json
 if ($write.promoted_count -le 0 -or $write.static_count_after -ge $write.static_count_before -or
     $write.active_count -gt 24 -or $reopen.promoted_count_reopened -ne $write.promoted_count -or
-    $reopen.visual_130_gate -ne 'NOT_QUALIFIED') { throw 'A4_REPORT_FAIL: native promotion/persistence invariant' }
+    $reopen.visual_130_gate -ne 'NOT_QUALIFIED' -or
+    $write.headless_native_transform_gate -ne 'NOT_QUALIFIED') { throw 'A4_REPORT_FAIL: native promotion/persistence invariant' }
 # A3 terrain/rock snapshots and native VoxelInstancer removals must be loaded
 # from disk; the sidecar must not use stale in-memory process state.
 if (-not (Test-Path $env:A3_SAVE_PATH) -or -not (Test-Path $env:A4_ROCK_STATE_PATH)) {
     throw 'A4_SAVE_FAIL: missing SQLite or rock sidecar'
 }
-Write-Host "A4_HEADLESS_E2E_PASS before=$($write.static_count_before) after=$($write.static_count_after) promoted=$($write.promoted_count)"
+Write-Host "A4_HEADLESS_WITH_LIMITATIONS_PASS before=$($write.static_count_before) after=$($write.static_count_after) controlled_bodies=$($write.promoted_count) native_transform=NOT_QUALIFIED"

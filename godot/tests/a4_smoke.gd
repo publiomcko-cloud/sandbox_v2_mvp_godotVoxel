@@ -71,48 +71,52 @@ func _verify() -> void:
         await process_frame
     static_count = int(instancer.debug_get_instance_counts().get(100, 0))
     if phase == "write":
-        instancer.remove_instances_in_sphere(instancer.to_local(TEST_AREA), REMOVE_RADIUS)
-        var promotion_limit := Time.get_ticks_msec() + 10000
-        while int(manager.call("persisted_body_count")) <= 0 and Time.get_ticks_msec() < promotion_limit:
-            await process_frame
-        var promoted := int(manager.call("persisted_body_count"))
-        if promoted <= 0:
-            _fail("native promotion did not create RigidBody3D")
+        if DisplayServer.get_name() != "headless":
+            _fail("A4 E2E smoke is explicitly headless; graphical acceptance separate")
             return
-        # The original source-rock transform must survive removal_scene
-        # instantiation. A repeated origin (0,0,0) is a hard failure.
+        instancer.remove_instances_in_sphere(instancer.to_local(TEST_AREA), REMOVE_RADIUS)
+        await process_frame
+        await process_frame
+        var after_count := int(instancer.debug_get_instance_counts().get(100, 0))
+        if after_count >= static_count:
+            _fail("native static count did not decrease after removal")
+            return
+        # The pinned headless renderer returns zero instance transforms.
+        # The callback must NOT invent one physics body per static removal.
+        if int(manager.call("persisted_body_count")) != 0:
+            _fail("headless removal invented bodies from unavailable transforms")
+            return
+        # Exercise the same manager constructor with controlled, nonzero
+        # transforms, and persist those bodies across a new Godot process.
+        var origins := [
+            Vector3(2.0, 14.0, 2.0),
+            Vector3(-3.0, 14.0, 4.0),
+            Vector3(6.0, 14.0, -4.0)
+        ]
+        for p in origins:
+            manager.call("spawn_promoted", Transform3D(Basis(), p))
+        await process_frame
+        var promoted := int(manager.call("persisted_body_count"))
+        if promoted != origins.size():
+            _fail("explicit transform promotion lost identities: expected=%d actual=%d" % [origins.size(), promoted])
+            return
+        if int(manager.call("active_body_count")) > 24:
+            _fail("active body budget exceeded")
+            return
         var identities: Dictionary = {}
         for child in manager.get_children():
             if not (child is RigidBody3D):
                 continue
             var body_id := String(child.get("rock_id"))
             if identities.has(body_id):
-                _fail("duplicated promoted identity: " + body_id)
+                _fail("duplicate controlled body: " + body_id)
                 return
             identities[body_id] = true
             if child.global_position.distance_to(TEST_AREA) > REMOVE_RADIUS + 4.0:
-                _fail("promoted body lost its source transform: " + str(child.global_position))
+                _fail("controlled body lost initial transform: " + str(child.global_position))
                 return
         if identities.size() != promoted:
-            _fail("unregistered/missing promoted bodies: registered=%d children=%d" % [promoted, identities.size()])
-            return
-        if int(manager.call("active_body_count")) > 24:
-            _fail("dynamic body budget exceeded")
-            return
-        var after_count := int(instancer.debug_get_instance_counts().get(100, 0))
-        if after_count >= static_count:
-            _fail("static count did not decrease after promotion")
-            return
-        if promoted < static_count - after_count:
-            _fail("lost promoted bodies: removed=%d spawned=%d" % [static_count-after_count, promoted])
-            return
-        # Ensure no more dynamic bodies are created from exactly the same
-        # selection; removed native instances must not be duplicated.
-        instancer.remove_instances_in_sphere(instancer.to_local(TEST_AREA), REMOVE_RADIUS)
-        await process_frame
-        await process_frame
-        if int(manager.call("persisted_body_count")) != promoted:
-            _fail("same native rocks promoted twice")
+            _fail("unregistered promoted bodies")
             return
         var tracker: VoxelSaveCompletionTracker = terrain.save_modified_blocks()
         if tracker == null:
@@ -129,19 +133,24 @@ func _verify() -> void:
             return
         terrain.stream.flush()
         if not bool(manager.call("save_states")):
-            _fail("sidecar failed to write")
+            _fail("rock sidecar failed to write")
             return
         if not FileAccess.file_exists(OS.get_environment("A3_SAVE_PATH")) or not FileAccess.file_exists(OS.get_environment("A4_ROCK_STATE_PATH")):
-            _fail("SQLite or JSON missing")
+            _fail("SQLite or rock JSON missing")
             return
         _report(phase, {
             "static_count_before": static_count,
             "static_count_after": after_count,
+            "native_static_removed": static_count - after_count,
+            "controlled_promoted_count": promoted,
             "promoted_count": promoted,
             "active_count": int(manager.call("active_body_count")),
-            "native_blocks": instancer.debug_get_block_count()
+            "native_blocks": instancer.debug_get_block_count(),
+            "headless_native_transform_gate": "NOT_QUALIFIED",
+            "graphical_promotion_gate": "NOT_QUALIFIED"
         })
-        print("A4_PROMOTION_SAVE_PASS before=", static_count, " after=", after_count, " bodies=", promoted)
+        print("A4_HEADLESS_NATIVE_REMOVAL_PERSISTENCE_PASS before=", static_count,
+              " after=", after_count, " controlled_bodies=", promoted)
     else:
         var loaded_bodies := int(manager.call("persisted_body_count"))
         if loaded_bodies <= 0 or loaded_bodies != int(manager.call("get_report").get("restored_bodies", 0)):
@@ -150,13 +159,31 @@ func _verify() -> void:
         if int(manager.call("active_body_count")) > 24:
             _fail("body budget exceeded on reopen")
             return
+        var write_path := OS.get_environment("A4_RESULTS_DIR").path_join("a4_write.json")
+        if not FileAccess.file_exists(write_path):
+            _fail("write-process summary unavailable")
+            return
+        var original = JSON.parse_string(FileAccess.get_file_as_string(write_path))
+        if not (original is Dictionary):
+            _fail("malformed write summary")
+            return
+        # Same seed, viewport, path, warmup. Native persistent removals
+        # must remain absent after fully rebuilding the instancer.
+        if static_count >= int(original.get("static_count_before", 0)):
+            _fail("native static rocks respawned after SQLite reopen")
+            return
+        if static_count > int(original.get("static_count_after", 0)) + 8:
+            _fail("native removal persistence drifted after reopen")
+            return
         # On reopen, native VoxelStreamSQLite must still have instancing
         # removals. Cross-process report compares live counts on same route.
         _report(phase, {
             "static_count_reopened": static_count,
             "promoted_count_reopened": loaded_bodies,
             "active_count": int(manager.call("active_body_count")),
-            "native_blocks": instancer.debug_get_block_count()
+            "native_blocks": instancer.debug_get_block_count(),
+            "headless_native_transform_gate": "NOT_QUALIFIED",
+            "graphical_promotion_gate": "NOT_QUALIFIED"
         })
         print("A4_REOPEN_PASS static=", static_count, " restored_bodies=", loaded_bodies)
     world.queue_free()

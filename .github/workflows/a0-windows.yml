@@ -1,4 +1,4 @@
-name: A0/A1 Windows native build and graph smoke
+name: A0/A1/A2 Windows native build and streaming smoke
 on:
   push:
     branches: [main]
@@ -53,6 +53,9 @@ jobs:
       - name: Static A1 contract validation
         shell: powershell
         run: python tests/check_a1_contract.py
+      - name: Static A2 route and telemetry contract
+        shell: powershell
+        run: python tests/check_a2_contract.py
       - name: Fetch pinned engine, generate custom API, compile native code
         shell: powershell
         run: |
@@ -63,6 +66,9 @@ jobs:
       - name: A1 deterministic SDF and scene smoke
         shell: powershell
         run: ./scripts/a1-smoke-windows.ps1
+      - name: A2 deterministic route and headless trace smoke
+        shell: powershell
+        run: ./scripts/a2-smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -72,3 +78,5 @@ jobs:
           path: |
             godot/bin/*.dll
             extension_api.json
+            reports/generated/a2-ci/*.json
+            reports/generated/a2-ci/*.jsonl

@@ -1,4 +1,4 @@
-name: A0-A5 Windows integration, rocks and water smoke
+name: A0-A7 Windows integration and final acceptance harness preflight
 on:
   push:
     branches: [main]
@@ -68,6 +68,9 @@ jobs:
       - name: A5 water, swimmer and shoreline static contract
         shell: powershell
         run: python tests/check_a5_contract.py
+      - name: A7 strict acceptance source contract and matrix fail-closed test
+        shell: powershell
+        run: python tests/check_a7_contract.py
       - name: Restore compiled native binary from approved A3 CI
         uses: actions/download-artifact@v4
         with:
@@ -96,6 +99,9 @@ jobs:
       - name: A5 buoyancy, current and shoreline SQLite reopen smoke
         shell: powershell
         run: ./scripts/a5-smoke-windows.ps1
+      - name: A7 short headless route/edit integrity smoke (not visual or perf qualification)
+        shell: powershell
+        run: ./scripts/a7-smoke-windows.ps1
       - name: Publish bootstrap build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -110,3 +116,6 @@ jobs:
             reports/generated/a3-ci/*.json
             reports/generated/a4-ci/*.json
             reports/generated/a5-ci/*.json
+            reports/generated/a7-ci/**/*.json
+            reports/generated/a7-ci/**/*.jsonl
+            reports/generated/a7-ci/**/A7_REPORT.md

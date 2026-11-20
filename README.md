@@ -13,6 +13,7 @@ MVP independente de sandbox volumétrico 3D com Godot 4.7.2 + Voxel Tools 1.7 in
 - [A3: edição C++, SQLite e teste de reabertura](docs/A3_IMPLEMENTACAO.md)
 - [A4: rochas em MultiMesh, promoção para RigidBody e estado persistido](docs/A4_IMPLEMENTACAO.md)
 - [A5: oceano y=0, empuxo, arrasto, corrente e nado](docs/A5_IMPLEMENTACAO.md)
+- [A7: campanha de aceite final e matriz PASS/FAIL/NOT_QUALIFIED](docs/A7_IMPLEMENTACAO.md)
 
 ## A0 Windows (PowerShell)
 Pré-requisitos: MSVC Build Tools x64, Python 3.12, Git e SCons 4.10.0.
@@ -63,3 +64,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a5-smoke-windows.p
 \`\`\`
 
 \`reports/generated/a5-ci\` contém testes de física e de geometria/edição. O CI headless verifica fórmulas, forças, colisão em fixture e correspondência do nível nominal y=0, não pixels, continuidade 130m nem p99 GPU/present.
+
+
+## A7 — verificação final do MVP A5 CPU16
+
+A7 começa no checkpoint A5 aprovado, preservando a configuração de jogo e excluindo A6/A6B experimentais. Inclui rotas a 18m/s, 3 seeds x 3 repetições, edição 10Hz/100 operações, evidências gráficas opcionais, verificações de persistência e relatórios de aceite rigorosos em reports/generated/a7. O workflow A7 em GitHub Actions valida scripts/contratos e smoke headless, não FPS total nem pixels.
+
+Comandos em docs/A7_IMPLEMENTACAO.md. Entrada individual curta (não qualificatória): powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a7-run-windows.ps1 -Scenario out_and_back_18mps_300s -Duration 60 -Warmup 45
+
+Campanha completa (90 execuções gráficas): powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a7-run-windows.ps1 -Full -Repeats 3 -Seeds 20261119,20261120,20261121 -Warmup 45
+
+O relatório não marca as metas PERF-60 / STREAM-18 / VIEW-130 / EDIT-100 como aprovadas sem evidência específica. Limitações de A4/A5 permanecem documentadas; não há alteração do terreno, CPU16, água, física ou streaming.

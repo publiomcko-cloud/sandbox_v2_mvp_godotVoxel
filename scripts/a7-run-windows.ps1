@@ -197,9 +197,34 @@ foreach ($name in $scenarios) {
                     }
                 }
                 $p.WaitForExit()
+                # Save the array as a single JSON input: Windows PowerShell 5.1
+                # differs from PowerShell 7 in pipeline array unrolling.
+                $snapshot = $readings.ToArray()
                 $cpuSamplesPath = Join-Path $folder 'a7_process_resources.json'
-                @($readings.ToArray()) | ConvertTo-Json -Depth 4 |
+                ConvertTo-Json -InputObject $snapshot -Depth 4 |
                     Set-Content -LiteralPath $cpuSamplesPath -Encoding UTF8
+                $cpuTotal = 0.0
+                $coresTotal = 0.0
+                $memoryPeak = 0.0
+                foreach ($reading in $snapshot) {
+                    $cpuTotal += [double]$reading.cpu_pct_machine
+                    $coresTotal += [double]$reading.cpu_equivalent_cores
+                    $memoryPeak = [Math]::Max($memoryPeak,[double]$reading.working_set_mb)
+                }
+                $count = $snapshot.Length
+                $resourceSummary = [ordered]@{
+                    schema='a7_process_resource_summary_v1'
+                    sample_count=$count
+                    cpu_pct_machine_avg=if ($count -gt 0) { [Math]::Round($cpuTotal/$count,2) } else { $null }
+                    cpu_equivalent_cores_avg=if ($count -gt 0) { [Math]::Round($coresTotal/$count,2) } else { $null }
+                    working_set_peak_mb=if ($count -gt 0) { [Math]::Round($memoryPeak,1) } else { $null }
+                    sampling_interval_target_ms=1000
+                    note='Process CPU and working set samples; not an app CPU+GPU+present frame trace.'
+                }
+                $resourceSummaryPath = Join-Path $folder 'a7_process_resource_summary.json'
+                $resourceSummary | ConvertTo-Json -Depth 4 |
+                    Set-Content -LiteralPath $resourceSummaryPath -Encoding UTF8
+                Write-Host "A7_RESOURCE_TELEMETRY_WRITTEN samples=$count path=$resourceSummaryPath"
             } else {
                 $p.WaitForExit()
             }

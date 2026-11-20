@@ -66,11 +66,20 @@ try {
             if (-not (Test-Path -LiteralPath $samplePath)) {
                 throw "A7_RESOURCE_AB_MISSING_RESOURCE_SAMPLES profile=$name"
             }
-            $samples = @(Get-Content -LiteralPath $samplePath -Raw | ConvertFrom-Json)
-            if ($samples.Count -lt 3) { throw "A7_RESOURCE_AB_TOO_FEW_SAMPLES profile=$name" }
-            $cpuAvg = ($samples | Measure-Object -Property cpu_pct_machine -Average).Average
-            $coresAvg = ($samples | Measure-Object -Property cpu_equivalent_cores -Average).Average
-            $memoryPeak = ($samples | Measure-Object -Property working_set_mb -Maximum).Maximum
+            # The scalar summary avoids PowerShell 5.1 ConvertFrom-Json array
+            # unrolling differences that falsely reported TOO_FEW_SAMPLES.
+            $resourceSummaryPath = Join-Path $resultFile.DirectoryName 'a7_process_resource_summary.json'
+            if (-not (Test-Path -LiteralPath $resourceSummaryPath)) {
+                throw "A7_RESOURCE_AB_MISSING_SUMMARY profile=$name path=$resourceSummaryPath"
+            }
+            $resourceSummary = Get-Content -LiteralPath $resourceSummaryPath -Raw | ConvertFrom-Json
+            if ($resourceSummary.schema -ne 'a7_process_resource_summary_v1' -or
+                $resourceSummary.sample_count -lt 3) {
+                throw "A7_RESOURCE_AB_TOO_FEW_SAMPLES profile=$name count=$($resourceSummary.sample_count) path=$resourceSummaryPath"
+            }
+            $cpuAvg = [double]$resourceSummary.cpu_pct_machine_avg
+            $coresAvg = [double]$resourceSummary.cpu_equivalent_cores_avg
+            $memoryPeak = [double]$resourceSummary.working_set_peak_mb
             $row = [pscustomobject]@{
                 profile=$name; repeat=$repeat; scenario=$Scenario; seed=$Seed
                 vsync_off_requested=[bool]$profile.vsync_off

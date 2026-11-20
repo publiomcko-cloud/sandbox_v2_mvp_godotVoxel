@@ -18,9 +18,12 @@ jobs:
   windows-graphical-ab:
     runs-on: [self-hosted, Windows, X64]
     timeout-minutes: 50
+    # Local runner may have Restricted machine policy; never change it globally.
+    env:
+      PSExecutionPolicyPreference: Bypass
     defaults:
       run:
-        shell: powershell
+        shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
     steps:
       - uses: actions/checkout@v4
 

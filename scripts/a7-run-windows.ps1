@@ -12,7 +12,10 @@ param(
     [double] $Duration = 0,
     [switch] $Full,
     [switch] $Capture,
-    [switch] $CiSmoke
+    [switch] $CiSmoke,
+    [switch] $VsyncOff,
+    [ValidateRange(0,48)] [int] $VoxelThreads = 0,
+    [switch] $ResourceTelemetry
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -35,6 +38,12 @@ if ($Seeds.Count -lt 1 -or (@($Seeds | Select-Object -Unique)).Count -ne $Seeds.
 $routes = @('stationary_180s','straight_18mps_600s','turns_18mps_300s',
             'out_and_back_18mps_300s','shoreline_180s','cave_180s','rocks_water_180s')
 $edits = @('edit_idle_100','edit_moving_100','boundary_edit_100')
+if (($VsyncOff -or $VoxelThreads -ne 0 -or $ResourceTelemetry) -and ($Full -or $CiSmoke)) {
+    throw 'A7 resource diagnostics are isolated; strict Full and headless smoke remain unchanged'
+}
+if (($VsyncOff -or $VoxelThreads -ne 0 -or $ResourceTelemetry) -and ($edits -contains $Scenario -or $Scenario -eq 'reopen_save')) {
+    throw 'A7 resource diagnostics only support timed route scenarios'
+}
 if ($Full -and ($Seeds.Count -lt 3 -or $Repeats -lt 3)) {
     throw 'A7 Full requires >=3 seeds and >=3 repeats per route; no silent workload downgrade'
 }
@@ -74,6 +83,10 @@ $manifest = [ordered]@{
     git_sha=$head; baseline_checkpoint='0c3fee959576d0a1faec9ceecffb4b132a65558b'
     baseline='A5 CPU16 GL Compatibility'; full=[bool]$Full
     ci_smoke=[bool]$CiSmoke; capture=[bool]$Capture
+    resource_diagnostic=[bool]($VsyncOff -or $VoxelThreads -ne 0 -or $ResourceTelemetry)
+    vsync_off_requested=[bool]$VsyncOff
+    voxel_threads_requested=$VoxelThreads
+    process_cpu_sampling=[bool]$ResourceTelemetry
     target_resolution='1920x1080'; target_speed_mps=18.0
     requested_view_distance_m=192; visual_radius_target_m=130
     mesh_block_voxels=16; lod_count=4; lod_distance=48
@@ -123,6 +136,7 @@ foreach ($name in $scenarios) {
                 $argsList += '--headless'
             } else {
                 $argsList += @('--rendering-method','gl_compatibility','--rendering-driver','opengl3')
+                if ($VsyncOff) { $argsList += '--disable-vsync' }
             }
             $argsList += @('--path',$quotedProject,'--script',$script,'--')
             if ($isEdit) {
@@ -135,8 +149,47 @@ foreach ($name in $scenarios) {
             }
             if ($Capture) { $argsList += '--capture' }
             if ($CiSmoke) { $argsList += '--ci-smoke' }
+            if (-not $isEdit) {
+                if ($VsyncOff) { $argsList += '--vsync-off' }
+                if ($VoxelThreads -gt 0) { $argsList += "--voxel-threads=$VoxelThreads" }
+            }
             Write-Host "A7_START scenario=$name seed=$seed rep=$r/$reps output=$folder"
-            $p = Start-Process -FilePath $exe -ArgumentList $argsList -PassThru -Wait -NoNewWindow
+            $p = Start-Process -FilePath $exe -ArgumentList $argsList -PassThru -NoNewWindow
+            if ($ResourceTelemetry) {
+                $readings = New-Object 'System.Collections.Generic.List[object]'
+                $startUtc = [DateTime]::UtcNow
+                $prevUtc = $startUtc
+                $prevCpu = 0.0
+                $logical = [Math]::Max(1, [Environment]::ProcessorCount)
+                while (-not $p.WaitForExit(1000)) {
+                    try {
+                        $p.Refresh()
+                        $nowUtc = [DateTime]::UtcNow
+                        $elapsed = ($nowUtc - $prevUtc).TotalSeconds
+                        $cpuNow = $p.TotalProcessorTime.TotalSeconds
+                        if ($elapsed -gt 0) {
+                            $cores = [Math]::Max(0.0, ($cpuNow - $prevCpu) / $elapsed)
+                            $readings.Add([pscustomobject]@{
+                                t_s=[Math]::Round(($nowUtc - $startUtc).TotalSeconds,3)
+                                cpu_equivalent_cores=[Math]::Round($cores,3)
+                                cpu_pct_machine=[Math]::Round(100.0*$cores/$logical,2)
+                                process_threads=$p.Threads.Count
+                                working_set_mb=[Math]::Round($p.WorkingSet64/1MB,1)
+                            })
+                        }
+                        $prevUtc = $nowUtc
+                        $prevCpu = $cpuNow
+                    } catch {
+                        Write-Warning "A7_RESOURCE_SAMPLE_WARNING: $($_.Exception.Message)"
+                    }
+                }
+                $p.WaitForExit()
+                $cpuSamplesPath = Join-Path $folder 'a7_process_resources.json'
+                @($readings.ToArray()) | ConvertTo-Json -Depth 4 |
+                    Set-Content -LiteralPath $cpuSamplesPath -Encoding UTF8
+            } else {
+                $p.WaitForExit()
+            }
             if ($p.ExitCode -ne 0) {
                 throw "A7_RUN_FAIL scenario=$name seed=$seed rep=$r code=$($p.ExitCode)"
             }

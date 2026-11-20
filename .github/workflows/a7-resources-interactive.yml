@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   windows-graphical-ab:
-    runs-on: [self-hosted, Windows, X64]
+    runs-on: [self-hosted, Windows, X64, a7-safgo15-gpu]
     timeout-minutes: 50
     # Local runner may have Restricted machine policy; never change it globally.
     env:
@@ -53,7 +53,11 @@ jobs:
             Write-Warning "A7_GPU_ENUMERATION_WARNING $($_.Exception.Message)"
           }
           Write-Host "A7_RUNNER_HARDWARE machine=$env:COMPUTERNAME runner=$env:RUNNER_NAME gpu=$($info.graphics_adapters -join ',')"
-          if ($sessionId -eq 0) {
+          if ($env:COMPUTERNAME -ne 'DESKTOP-SAFGO15') {
+            $info.reason = "RUNNER_HOST_MISMATCH: expected DESKTOP-SAFGO15; got $env:COMPUTERNAME."
+          } elseif (-not (@($info.graphics_adapters) -contains 'NVIDIA GeForce GTX 1050 Ti')) {
+            $info.reason = 'RUNNER_GPU_MISMATCH: expected the GTX 1050 Ti baseline GPU.'
+          } elseif ($sessionId -eq 0) {
             $info.reason = 'RUNNER_SESSION_0: GitHub runner Windows service has no interactive display. Stop the service and launch its run.cmd in a signed-in desktop session.'
           } else {
             try {

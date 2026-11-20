@@ -22,10 +22,11 @@ def _finite(d: dict, key: str) -> float | None:
 
 def analyze(root: Path) -> dict:
     manifest = _load(root/"manifest.json") if (root/"manifest.json").is_file() else {}
-    routes, edits, errors = [], [], []
+    routes, edits, reopens, errors = [], [], [], []
     for kind, filename, expected, store in (
         ("route","a7_route.json","a7_route_v1",routes),
-        ("edit","a7_edits.json","a7_edit_v1",edits)
+        ("edit","a7_edits.json","a7_edit_v1",edits),
+        ("reopen","a7_reopen.json","a7_reopen_v1",reopens)
     ):
         for p in sorted(root.rglob(filename)):
             try:
@@ -36,8 +37,15 @@ def analyze(root: Path) -> dict:
             except (OSError,ValueError) as e:
                 errors.append(f"{p}: {e}")
     expected = len(manifest.get("scenarios",[]))*len(manifest.get("seeds",[]))*int(manifest.get("repeats",0))
-    actual = len(routes)+len(edits)
-    complete = expected > 0 and expected == actual and not errors
+    actual = len(routes)+len(edits)+len(reopens)
+    expected_checks = {"a3-smoke-windows.ps1", "a4-smoke-windows.ps1", "a5-smoke-windows.ps1"}
+    reopen_valid = all(
+        r.get("scenario") == "reopen_save" and r.get("seed") == 20261119
+        and r.get("passed") is True and isinstance(r.get("checks"), list)
+        and len(r["checks"]) == 3 and set(r["checks"]) == expected_checks
+        for r in reopens
+    )
+    complete = expected > 0 and expected == actual and not errors and reopen_valid
     route_groups, edit_groups = defaultdict(list), defaultdict(list)
     for r in routes: route_groups[r.get("route","unknown")].append(r)
     for e in edits: edit_groups[e.get("scenario","unknown")].append(e)
@@ -77,6 +85,8 @@ def analyze(root: Path) -> dict:
                     "No synchronized raw input to FIRST CORRECT PRESENTED pixel timestamps; frame_post_draw is not presentation."}
     }
     warnings = list(errors)
+    if not reopen_valid:
+        warnings.append("Reopen functional regression evidence incomplete or invalid.")
     if not complete:
         warnings.append(f"Missing or extra sessions: {actual}/{expected} reported.")
     if manifest.get("baseline_checkpoint") not in (None,BASELINE):
@@ -94,7 +104,10 @@ def analyze(root: Path) -> dict:
         "baseline_checkpoint":BASELINE,"full":bool(manifest.get("full")),
         "headless_smoke":bool(manifest.get("ci_smoke")),
         "runs_expected":expected,"runs_reported":actual,"complete":complete,
-        "route_results":timed,"edit_results":edited,"gates":gates,
+        "route_results":timed,"edit_results":edited,
+        "reopen_results":{"runs":len(reopens),"passed":sum(r.get("passed") is True for r in reopens),
+                          "fixed_seed":20261119,"checks":sorted(expected_checks) if reopens else []},
+        "gates":gates,
         "overall":"FAIL" if slow else "NOT_QUALIFIED",
         "automatic_acceptance":False,"warnings":warnings,
         "known_accepted_mvp_limitations":[
@@ -130,6 +143,9 @@ def markdown(d: dict) -> str:
                  "|---|---:|---:|---:|---:|---:|"])
     for name,r in d["edit_results"].items():
         rows.append(f"| {name} | {r['runs']} | {r['attempts']} | {r['accepted']} | {r['sdf_changed']} | {r['native_apply_over100']} |")
+    if d["reopen_results"]["runs"]:
+        rows.extend(["","## Reabertura funcional","",
+                     f"A3/A4/A5 smokes registrados (seed fixa 20261119): {d['reopen_results']['passed']}/{d['reopen_results']['runs']} sessões."])
     rows.extend(["","## Evidências faltantes",""])
     rows.extend("- "+m for m in d["missing_evidence"])
     rows.extend(["","## Avisos",""])

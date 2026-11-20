@@ -28,6 +28,7 @@ assert "EDIT_COUNT := 100" in edit and "RATE_S := 0.1" in edit
 assert "frame_post_draw" in edit and '"first_correct_presented_pixel_ms":null' in edit
 assert '"edit_100_gate":"NOT_QUALIFIED"' in edit
 assert "A7_NO_AUTOMATIC_ACCEPTANCE" in shell
+assert "a7_reopen.json" in shell and "A7_REOPEN_FUNCTIONAL_SMOKES_PASS" in shell
 assert "Seeds.Count -lt 3" in shell and "A7_CAMPAIGN_DIR" in shell
 assert "mesh_block_size = 16" in scene and "view_distance = 192" in scene
 assert (root/"godot/project.godot").read_text(encoding="utf-8").count("gl_compatibility") >= 2
@@ -53,4 +54,23 @@ with tempfile.TemporaryDirectory() as td:
     result=module.analyze(d)
     assert result["gates"]["EDIT-100"]["status"]=="FAIL"
     assert all(result["gates"][gate]["status"]=="NOT_QUALIFIED" for gate in ("PERF-60","STREAM-18","VIEW-130"))
+with tempfile.TemporaryDirectory() as td:
+    d=Path(td)
+    (d/"manifest.json").write_text(json.dumps({
+        "baseline_checkpoint":module.BASELINE,"full":False,"ci_smoke":False,
+        "scenarios":["reopen_save"],"seeds":[20261119],"repeats":1
+    }),encoding="utf-8")
+    expected_checks=["a3-smoke-windows.ps1","a4-smoke-windows.ps1","a5-smoke-windows.ps1"]
+    result=module.analyze(d)
+    assert not result["complete"] and result["runs_reported"]==0
+    marker={"schema":"a7_reopen_v1","scenario":"reopen_save",
+            "seed":20261119,"passed":True,"checks":expected_checks}
+    (d/"a7_reopen.json").write_text(json.dumps(marker),encoding="utf-8")
+    result=module.analyze(d)
+    assert result["complete"] and result["runs_reported"]==1
+    assert result["reopen_results"]["passed"]==1
+    assert result["overall"]=="NOT_QUALIFIED" and not result["automatic_acceptance"]
+    marker["checks"]=expected_checks[:-1]
+    (d/"a7_reopen.json").write_text(json.dumps(marker),encoding="utf-8")
+    assert not module.analyze(d)["complete"]
 print("A7_STATIC_AND_FAIL_CLOSED_MATRIX_PASS")

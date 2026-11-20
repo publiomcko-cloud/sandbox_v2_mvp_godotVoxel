@@ -31,6 +31,8 @@ O modo Full não aceita encurtar duração nominal ou reduzir seeds/repetições
 
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\a7-run-windows.ps1 -Scenario reopen_save
 
+O cenário reopen_save produz a7_reopen.json após a aprovação dos smokes A3/A4/A5; a matriz contabiliza 1/1 sessão funcional, mas conserva os quatro gates gráficos como NOT_QUALIFIED.
+
 Para recompilar o relatório de uma pasta: python .\scripts\a7_report.py .\reports\generated\a7\campaign-YYYYMMDD-HHMMSS-PID
 
 ## Limites da qualificação

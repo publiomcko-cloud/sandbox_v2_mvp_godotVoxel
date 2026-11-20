@@ -89,11 +89,24 @@ $expected = 0
 foreach ($name in $scenarios) {
     if ($name -eq 'reopen_save') {
         if ($Full) { throw 'Reopen functional integration is separately gated by A3-A5; Full only includes timed routes and edits' }
-        foreach ($script in @('a3-smoke-windows.ps1','a4-smoke-windows.ps1','a5-smoke-windows.ps1')) {
+        $reopenScripts = @('a3-smoke-windows.ps1','a4-smoke-windows.ps1','a5-smoke-windows.ps1')
+        foreach ($script in $reopenScripts) {
             & (Join-Path $root "scripts/$script")
-            if ($LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "A7_REOPEN_REGRESSION_FAIL $script" }
+            $scriptSucceeded = $?
+            if (-not $scriptSucceeded -or ($LASTEXITCODE -and $LASTEXITCODE -ne 0)) {
+                throw "A7_REOPEN_REGRESSION_FAIL $script"
+            }
         }
-        Write-Host 'A7_REOPEN_FUNCTIONAL_SMOKES_PASS (fixed seed 20261119)'
+        $reopenResult = [ordered]@{
+            schema='a7_reopen_v1'; scenario='reopen_save'
+            seed=20261119; passed=$true; checks=@($reopenScripts)
+            completed_utc=[DateTime]::UtcNow.ToString('o')
+            note='Functional A3/A4/A5 reopen smoke only; does not qualify graphical pixels or persistence for other seeds.'
+        }
+        ($reopenResult | ConvertTo-Json -Depth 6) |
+            Set-Content -LiteralPath (Join-Path $rootOutput 'a7_reopen.json') -Encoding UTF8
+        $expected++
+        Write-Host 'A7_REOPEN_FUNCTIONAL_SMOKES_PASS (fixed seed 20261119; report=a7_reopen.json)'
         continue
     }
     foreach ($seed in $runSeeds) {

@@ -28,7 +28,12 @@ func _start() -> void:
     var seed := int(_arg("seed","20261119"))
     var ci := _flag("ci-smoke")
     var capture := _flag("capture")
+    var vsync_off := _flag("vsync-off")
+    var voxel_threads_requested := int(_arg("voxel-threads","0"))
     var headless := DisplayServer.get_name()=="headless"
+    if voxel_threads_requested<0 or voxel_threads_requested>48 or (ci and (vsync_off or voxel_threads_requested>0)):
+        _fail("resource diagnostic flags invalid or not allowed in headless smoke")
+        return
     if normal<1.0 or duration<=0.0 or duration>normal or warmup<0.0 or warmup>180.0:
         _fail("unknown route or invalid duration/warmup")
         return
@@ -42,6 +47,11 @@ func _start() -> void:
     if not headless:
         DisplayServer.window_set_size(Vector2i(1920,1080))
         root.size=Vector2i(1920,1080)
+        if vsync_off:
+            DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+    if voxel_threads_requested>0:
+        # A/B diagnostic only: preserve the A5 project defaults.
+        VoxelEngine.set_thread_count(voxel_threads_requested)
     var packed: PackedScene=load("res://scenes/main.tscn")
     if packed==null:
         _fail("A5 scene missing")
@@ -63,4 +73,6 @@ func _start() -> void:
     runner.seed_value=seed
     runner.ci_smoke=ci
     runner.capture=capture
+    runner.vsync_off_requested=vsync_off
+    runner.voxel_threads_requested=voxel_threads_requested
     world.add_child(runner)

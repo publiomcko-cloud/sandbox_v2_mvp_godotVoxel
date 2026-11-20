@@ -154,7 +154,20 @@ foreach ($name in $scenarios) {
                 if ($VoxelThreads -gt 0) { $argsList += "--voxel-threads=$VoxelThreads" }
             }
             Write-Host "A7_START scenario=$name seed=$seed rep=$r/$reps output=$folder"
-            $p = Start-Process -FilePath $exe -ArgumentList $argsList -PassThru -NoNewWindow
+            # Windows PowerShell 5.1 can return a Process without an exit-code
+            # handle when Start-Process uses -NoNewWindow -PassThru.
+            # Explicit .NET startup preserves the process handle and ExitCode.
+            $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+            $startInfo.FileName = $exe
+            $startInfo.Arguments = ($argsList -join ' ')
+            $startInfo.WorkingDirectory = $root
+            $startInfo.UseShellExecute = $false
+            $startInfo.CreateNoWindow = $false
+            $p = New-Object System.Diagnostics.Process
+            $p.StartInfo = $startInfo
+            if (-not $p.Start()) {
+                throw "A7_RUN_START_FAIL scenario=$name seed=$seed rep=$r"
+            }
             if ($ResourceTelemetry) {
                 $readings = New-Object 'System.Collections.Generic.List[object]'
                 $startUtc = [DateTime]::UtcNow
@@ -190,8 +203,11 @@ foreach ($name in $scenarios) {
             } else {
                 $p.WaitForExit()
             }
-            if ($p.ExitCode -ne 0) {
-                throw "A7_RUN_FAIL scenario=$name seed=$seed rep=$r code=$($p.ExitCode)"
+            $p.Refresh()
+            $exitCode = $p.ExitCode
+            $p.Dispose()
+            if ($exitCode -ne 0) {
+                throw "A7_RUN_FAIL scenario=$name seed=$seed rep=$r code=$exitCode"
             }
             $summary = Join-Path $folder ($(if ($isEdit) { 'a7_edits.json' } else { 'a7_route.json' }))
             if (-not (Test-Path $summary)) { throw "A7 missing report $summary" }

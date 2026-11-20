@@ -37,11 +37,22 @@ jobs:
             schema='a7_interactive_preflight_v1'
             session_id=$sessionId
             session_name=$env:SESSIONNAME
+            machine_name=$env:COMPUTERNAME
+            runner_name=$env:RUNNER_NAME
             windows_user=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+            graphics_adapters=@()
             desktop_resolution=$null
             accepted=$false
             reason=$null
           }
+          try {
+            $info.graphics_adapters = @(
+              Get-CimInstance Win32_VideoController | ForEach-Object { $_.Name }
+            )
+          } catch {
+            Write-Warning "A7_GPU_ENUMERATION_WARNING $($_.Exception.Message)"
+          }
+          Write-Host "A7_RUNNER_HARDWARE machine=$env:COMPUTERNAME runner=$env:RUNNER_NAME gpu=$($info.graphics_adapters -join ',')"
           if ($sessionId -eq 0) {
             $info.reason = 'RUNNER_SESSION_0: GitHub runner Windows service has no interactive display. Stop the service and launch its run.cmd in a signed-in desktop session.'
           } else {

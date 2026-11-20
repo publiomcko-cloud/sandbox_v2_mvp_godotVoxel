@@ -1,0 +1,66 @@
+extends SceneTree
+# One fresh process per route/seed/run. World is still A5 CPU16/GL.
+const Routes = preload("res://tests/a7_routes.gd")
+const Runtime = preload("res://tests/a7_route_runtime.gd")
+
+func _initialize() -> void:
+    call_deferred("_start")
+
+func _arg(name: String, fallback: String) -> String:
+    var prefix := "--"+name+"="
+    for a in OS.get_cmdline_user_args():
+        if a.begins_with(prefix):
+            return a.substr(prefix.length())
+    return fallback
+
+func _flag(name: String) -> bool:
+    return OS.get_cmdline_user_args().has("--"+name)
+
+func _fail(s: String) -> void:
+    push_error("A7_ROUTE_CONFIG_FAIL "+s)
+    quit(2)
+
+func _start() -> void:
+    var route := _arg("route","")
+    var normal := Routes.duration_for(route)
+    var duration := float(_arg("duration",str(normal)))
+    var warmup := float(_arg("warmup","45"))
+    var seed := int(_arg("seed","20261119"))
+    var ci := _flag("ci-smoke")
+    var capture := _flag("capture")
+    var headless := DisplayServer.get_name()=="headless"
+    if normal<1.0 or duration<=0.0 or duration>normal or warmup<0.0 or warmup>180.0:
+        _fail("unknown route or invalid duration/warmup")
+        return
+    if headless and (not ci or capture or duration>3.0 or warmup>1.0):
+        _fail("headless only allowed as <=3s CPU smoke, not performance evidence")
+        return
+    if not headless and (RenderingServer.get_current_rendering_method()!="gl_compatibility"
+            or RenderingServer.get_current_rendering_driver_name().to_lower()!="opengl3"):
+        _fail("A7 must use untouched A5 GL Compatibility renderer")
+        return
+    if not headless:
+        DisplayServer.window_set_size(Vector2i(1920,1080))
+        root.size=Vector2i(1920,1080)
+    var packed: PackedScene=load("res://scenes/main.tscn")
+    if packed==null:
+        _fail("A5 scene missing")
+        return
+    var world: Node3D=packed.instantiate()
+    var terrain: VoxelLodTerrain=world.get_node("Terrain") as VoxelLodTerrain
+    if terrain==null:
+        _fail("Terrain node missing")
+        return
+    terrain.set("world_seed",seed)
+    if terrain.mesh_block_size!=16 or terrain.use_gpu_generation or terrain.lod_count!=4 or terrain.view_distance!=192 or absf(terrain.lod_distance-48.0)>0.001:
+        _fail("baseline not A5 CPU16 / 4 LODs / 192m view")
+        return
+    root.add_child(world)
+    var runner:=Runtime.new()
+    runner.route=route
+    runner.duration_s=duration
+    runner.warmup_s=warmup
+    runner.seed_value=seed
+    runner.ci_smoke=ci
+    runner.capture=capture
+    world.add_child(runner)

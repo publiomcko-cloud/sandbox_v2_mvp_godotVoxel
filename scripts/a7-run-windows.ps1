@@ -212,12 +212,20 @@ foreach ($name in $scenarios) {
                     $memoryPeak = [Math]::Max($memoryPeak,[double]$reading.working_set_mb)
                 }
                 $count = $snapshot.Length
+                $cpuMean = $null
+                $coresMean = $null
+                $workingPeak = $null
+                if ($count -gt 0) {
+                    $cpuMean = [Math]::Round($cpuTotal/$count,2)
+                    $coresMean = [Math]::Round($coresTotal/$count,2)
+                    $workingPeak = [Math]::Round($memoryPeak,1)
+                }
                 $resourceSummary = [ordered]@{
                     schema='a7_process_resource_summary_v1'
                     sample_count=$count
-                    cpu_pct_machine_avg=if ($count -gt 0) { [Math]::Round($cpuTotal/$count,2) } else { $null }
-                    cpu_equivalent_cores_avg=if ($count -gt 0) { [Math]::Round($coresTotal/$count,2) } else { $null }
-                    working_set_peak_mb=if ($count -gt 0) { [Math]::Round($memoryPeak,1) } else { $null }
+                    cpu_pct_machine_avg=$cpuMean
+                    cpu_equivalent_cores_avg=$coresMean
+                    working_set_peak_mb=$workingPeak
                     sampling_interval_target_ms=1000
                     note='Process CPU and working set samples; not an app CPU+GPU+present frame trace.'
                 }

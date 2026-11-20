@@ -1,5 +1,5 @@
 param(
-    [string] $RunnerRoot = 'C:\actions-runner',
+    [string] $RunnerRoot = 'C:\actios-runner-org1',
     [string] $ServiceName = '',
     [string] $TaskName = 'GitHub-A7-Interactive-Runner',
     [switch] $RestoreService

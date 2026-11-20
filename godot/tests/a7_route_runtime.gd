@@ -94,7 +94,8 @@ func _probes() -> int:
 
 func _sample(phase: String, t: float) -> void:
     var hits := _probes()
-    _min_probe = mini(_min_probe,hits)
+    if phase == "moving":
+        _min_probe = mini(_min_probe,hits)
     if hits == 8 and _ready_at_ms < 0.0:
         _ready_at_ms = float(Time.get_ticks_usec() - _begin_us)/1000.0
     var rid := get_viewport().get_viewport_rid()

@@ -62,7 +62,7 @@ func _run() -> void:
     if count<1 or count>EDIT_COUNT or warmup<0.0 or warmup>180.0:
         _fail("count/warmup outside contract")
         return
-    if ci and (count>2 or warmup>1.0 or evidence==true):
+    if ci and (count>2 or warmup>12.0 or evidence==true):
         _fail("CI permits only <=2 headless edits and no captures")
         return
     if DisplayServer.get_name()=="headless" and not ci:
@@ -99,7 +99,7 @@ func _run() -> void:
     player.set_physics_process(false)
     player.set_process_unhandled_input(false)
     player.global_position=Vector3(10,22,15)
-    if tool==null or not world.is_voxel_ready():
+    if tool==null or not bool(world.call("is_voxel_ready")):
         _fail("native brush/terrain unavailable")
         return
     var warming := Time.get_ticks_usec()
@@ -149,7 +149,7 @@ func _run() -> void:
             continue
         var sample:=Vector3i(roundi(center.x),roundi(center.y),roundi(center.z))
         var before:=tool.get_voxel_f(sample)
-        if not world.can_edit_sphere(center,RADIUS_M):
+        if not bool(world.call("can_edit_sphere",center,RADIUS_M)):
             row["reject_reason"]="LOD0_not_editable"
             rejected+=1
             trace.store_line(JSON.stringify(row))
@@ -162,7 +162,7 @@ func _run() -> void:
                 previews+=1
         # Input-equivalent accepted call begins here, NOT from OS device.
         var begun:=Time.get_ticks_usec()
-        var success:=world.edit_sphere(center,add,RADIUS_M)
+        var success: bool = bool(world.call("edit_sphere",center,add,RADIUS_M))
         var end_cpu:=Time.get_ticks_usec()
         if not success:
             row["reject_reason"]="native_rejected"

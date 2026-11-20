@@ -17,6 +17,15 @@ foreach ($scenario in @('stationary_180s', 'edit_idle_100')) {
         $m.gates.'EDIT-100'.status -ne 'NOT_QUALIFIED') {
         throw "A7 smoke illegally qualified acceptance without pixels: $scenario"
     }
+    if ($scenario -eq 'edit_idle_100') {
+        $editReport = Get-ChildItem -LiteralPath $env:A7_CAMPAIGN_DIR -Filter 'a7_edits.json' -Recurse -File |
+            Select-Object -First 1
+        if ($null -eq $editReport) { throw 'A7 expected real headless edit report' }
+        $ed = Get-Content -LiteralPath $editReport.FullName -Raw | ConvertFrom-Json
+        if ($ed.accepted_count -lt 1 -or $ed.sdf_changed_count -lt 1) {
+            throw "A7_EDIT_SMOKE_NO_ACTUAL_EDITS accepted=$($ed.accepted_count) changed=$($ed.sdf_changed_count)"
+        }
+    }
     Write-Host "A7_HEADLESS_CONFIG_PASS scenario=$scenario report=$matrixPath"
 }
 Write-Host 'A7_CI_PASS_WITH_UNQUALIFIED_GRAPHICS no strict gate auto-approved'

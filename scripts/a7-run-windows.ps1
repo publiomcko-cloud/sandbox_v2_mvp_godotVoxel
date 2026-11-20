@@ -114,7 +114,8 @@ foreach ($name in $scenarios) {
             $argsList += @('--path',$quotedProject,'--script',$script,'--')
             if ($isEdit) {
                 $count = if ($CiSmoke) { 2 } else { 100 }
-                $argsList += @("--scenario=$name","--seed=$seed","--warmup=$Warmup","--count=$count")
+                $editWarmup = if ($CiSmoke) { 10.0 } else { $Warmup }
+                $argsList += @("--scenario=$name","--seed=$seed","--warmup=$editWarmup","--count=$count")
             } else {
                 $argsList += @("--route=$name","--seed=$seed","--warmup=$Warmup")
                 if ($Duration -gt 0) { $argsList += "--duration=$Duration" }

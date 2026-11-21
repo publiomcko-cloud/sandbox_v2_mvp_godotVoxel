@@ -15,7 +15,8 @@ param(
     [switch] $CiSmoke,
     [switch] $VsyncOff,
     [ValidateRange(0,48)] [int] $VoxelThreads = 0,
-    [switch] $ResourceTelemetry
+    [switch] $ResourceTelemetry,
+    [string] $PresentMonExe = ''
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -25,6 +26,10 @@ $project = Join-Path $root 'godot'
 $dll = Join-Path $project 'bin/sandbox_native.windows.template_debug.x86_64.dll'
 if (-not (Test-Path $exe) -or -not (Test-Path $dll)) {
     throw 'A7 requires pinned Godot + A3 native DLL (bootstrap-windows.ps1 -SkipDownload)'
+}
+if ($PresentMonExe -and (-not (Test-Path -LiteralPath $PresentMonExe))) { throw "A7 PresentMon executable missing: $PresentMonExe" }
+if ($PresentMonExe -and ($CiSmoke -or $Full -or $Capture -or $VoxelThreads -ne 0)) {
+    throw 'A7 PresentMon ETW is restricted to non-headless isolated timed routes with automatic voxel threads and no screenshot readback'
 }
 if ($Capture -and $Full) {
     throw 'A7 refuses screenshot overhead inside comparable full performance campaign; use a separate -Capture evidence run'
@@ -87,6 +92,7 @@ $manifest = [ordered]@{
     vsync_off_requested=[bool]$VsyncOff
     voxel_threads_requested=$VoxelThreads
     process_cpu_sampling=[bool]$ResourceTelemetry
+    presentmon_requested=[bool]$PresentMonExe
     target_resolution='1920x1080'; target_speed_mps=18.0
     requested_view_distance_m=192; visual_radius_target_m=130
     mesh_block_voxels=16; lod_count=4; lod_distance=48
@@ -168,6 +174,38 @@ foreach ($name in $scenarios) {
             if (-not $p.Start()) {
                 throw "A7_RUN_START_FAIL scenario=$name seed=$seed rep=$r"
             }
+            $pmProcess = $null
+            $pmCsv = Join-Path $folder 'a7_presentmon.csv'
+            $pmStatusPath = Join-Path $folder 'a7_presentmon_status.json'
+            $pmStatus = [ordered]@{
+                schema='a7_presentmon_status_v1'
+                requested=[bool]$PresentMonExe
+                process_id=$p.Id
+                collection_started=$false
+                exit_code=$null
+                csv_exists=$false
+                csv_bytes=0
+                capture_error=$null
+                note='Raw ETW CSV, not independently verified end-to-end photon or world-pixel correctness.'
+            }
+            if ($PresentMonExe) {
+                try {
+                    $pmArgs = '--process_id ' + $p.Id + ' --date_time --output_file "' + $pmCsv + '" --no_console_stats --terminate_on_proc_exit --terminate_after_timed --timed ' + ([int][Math]::Ceiling($Warmup+$Duration+45))
+                    $pmStart = New-Object System.Diagnostics.ProcessStartInfo
+                    $pmStart.FileName = $PresentMonExe
+                    $pmStart.Arguments = $pmArgs
+                    $pmStart.WorkingDirectory = $folder
+                    $pmStart.UseShellExecute = $false
+                    $pmStart.CreateNoWindow = $true
+                    $pmProcess = New-Object System.Diagnostics.Process
+                    $pmProcess.StartInfo = $pmStart
+                    $pmStatus.collection_started = [bool]$pmProcess.Start()
+                    Write-Host "A7_PRESENTMON_START pid=$($p.Id) started=$($pmStatus.collection_started) output=$pmCsv"
+                } catch {
+                    $pmStatus.capture_error=$_.Exception.Message
+                    Write-Warning "A7_PRESENTMON_CAPTURE_WARNING: $($pmStatus.capture_error)"
+                }
+            }
             if ($ResourceTelemetry) {
                 $readings = New-Object 'System.Collections.Generic.List[object]'
                 $startUtc = [DateTime]::UtcNow
@@ -235,6 +273,31 @@ foreach ($name in $scenarios) {
                 Write-Host "A7_RESOURCE_TELEMETRY_WRITTEN samples=$count path=$resourceSummaryPath"
             } else {
                 $p.WaitForExit()
+            }
+            if ($PresentMonExe) {
+                if ($null -ne $pmProcess -and $pmStatus.collection_started) {
+                    try {
+                        if (-not $pmProcess.WaitForExit(15000)) {
+                            # Stop only this child collector, not unrelated ETW sessions.
+                            $pmProcess.Kill()
+                            $pmProcess.WaitForExit()
+                            $pmStatus.capture_error='PRESENTMON_TIMED_OUT_AFTER_GODOT_EXIT'
+                        }
+                        $pmProcess.Refresh()
+                        $pmStatus.exit_code=$pmProcess.ExitCode
+                    } catch {
+                        $pmStatus.capture_error=$_.Exception.Message
+                    } finally {
+                        $pmProcess.Dispose()
+                    }
+                }
+                $pmStatus.csv_exists=Test-Path -LiteralPath $pmCsv
+                if ($pmStatus.csv_exists) {
+                    $pmStatus.csv_bytes=(Get-Item -LiteralPath $pmCsv).Length
+                }
+                $pmStatus | ConvertTo-Json -Depth 5 |
+                    Set-Content -LiteralPath $pmStatusPath -Encoding UTF8
+                Write-Host "A7_PRESENTMON_STATUS exit=$($pmStatus.exit_code) csv_bytes=$($pmStatus.csv_bytes)"
             }
             $p.Refresh()
             $exitCode = $p.ExitCode

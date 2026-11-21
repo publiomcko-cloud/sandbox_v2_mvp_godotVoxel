@@ -22,8 +22,8 @@ if ([System.Diagnostics.Process]::GetCurrentProcess().SessionId -eq 0) {
 # PresentMon ETW requires Performance Log Users membership or elevation. Do NOT
 # elevate the GitHub Actions runner; its workflows should remain unprivileged.
 $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
-$perfLogUsersSid = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-559')
+$principal = [System.Security.Principal.WindowsPrincipal]::new($identity)
+$perfLogUsersSid = [System.Security.Principal.SecurityIdentifier]::new('S-1-5-32-559')
 $etwAuthorized = [bool]($principal.IsInRole($perfLogUsersSid) -or
     $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator))
 if (-not $etwAuthorized) {

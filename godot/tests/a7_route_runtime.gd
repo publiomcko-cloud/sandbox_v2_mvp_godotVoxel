@@ -35,6 +35,7 @@ var _min_probe := 8
 var _samples := 0
 var _captures := 0
 var _camera_initial_fov := 0.0
+var _measurement_epoch_begin := -1.0
 
 func _ready() -> void:
     _world = get_parent()
@@ -168,10 +169,12 @@ func _process(_delta: float) -> void:
         if age<warmup_s:
             return
         _movement_begin_us=now
+        _measurement_epoch_begin=Time.get_unix_time_from_system()
         _previous_us=now
         _next_sample_s=0.0
         _next_screenshot_s=0.0
         _emit({"type":"warmup_end","age_s":age,
+               "measurement_epoch_begin_s":_measurement_epoch_begin,
                "startup_eight_mesh_probes_ms":_ready_at_ms,
                "startup_pixels_verified":false})
         return
@@ -217,6 +220,8 @@ func _finish() -> void:
         "engine_max_fps":Engine.max_fps,
         "voxel_threads_requested":voxel_threads_requested,
         "voxel_threads_actual":VoxelEngine.get_thread_count(),
+        "measurement_epoch_begin_s":_measurement_epoch_begin,
+        "measurement_epoch_end_s":Time.get_unix_time_from_system(),
         "frame_count":_intervals.size(),
         "frame_start_p50_ms":_percentile(_intervals,0.5),
         "frame_start_p95_ms":_percentile(_intervals,0.95),

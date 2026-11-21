@@ -8,10 +8,8 @@ import sys
 import time
 from pathlib import Path
 
-NUMERIC_COLUMNS = [
-    "DisplayLatency", "MsBetweenDisplayChange", "MsBetweenPresents",
-    "MsCPUBusy", "MsGPUTime", "MsUntilDisplayed", "MsRenderPresentLatency",
-]
+# PresentMon 2.6.0 --v2_metrics --date_time columns; do not mix v1 names.
+NUMERIC_COLUMNS = ["DisplayLatency", "DisplayedTime", "FrameTime", "CPUBusy", "GPUTime"]
 def percentile(values, q):
     if not values:
         return None
@@ -68,6 +66,9 @@ def analyze_run(folder: Path) -> dict:
         "display_change_p99_ms": None,
         "present_interval_p99_ms": None,
         "gpu_work_p99_ms": None,
+        "cpu_frame_time_p99_ms": None,
+        "displayed_time_p99_ms": None,
+        "etw_csv_schema": "v2_metrics",
         "reason": None,
         "strict_acceptance": "NOT_QUALIFIED",
     }
@@ -86,14 +87,17 @@ def analyze_run(folder: Path) -> dict:
     samples = {k: [] for k in NUMERIC_COLUMNS}
     first = last = None
     seen_time = False
+    previous_display_epoch_by_swapchain = {}
+    displayed_gaps_ms = []
     with csv_file.open("r", encoding="utf-8-sig", errors="replace", newline="") as f:
         reader = csv.DictReader(f)
         headers = set(reader.fieldnames or [])
         if "CPUStartDateTime" not in headers:
             result["reason"] = "PresentMon CSV lacks CPUStartDateTime; cannot align measurement window"
             return result
-        if not ("DisplayLatency" in headers and ("MsBetweenDisplayChange" in headers or "DisplayedTime" in headers)):
-            result["reason"] = "PresentMon CSV lacks usable display-time metrics"
+        required = {"CPUStartDateTime", "DisplayLatency", "DisplayedTime", "FrameTime", "GPUTime"}
+        if not required.issubset(headers):
+            result["reason"] = "PresentMon --v2_metrics CSV headers missing: " + ", ".join(sorted(required - headers))
             return result
         for row in reader:
             result["presentmon_rows_total"] += 1
@@ -106,11 +110,17 @@ def analyze_run(folder: Path) -> dict:
             result["presentmon_rows_in_window"] += 1
             if first is None: first = stamp
             last = stamp
-            displayed = number(row.get("DisplayLatency")) is not None
-            if not displayed:
+            latency = number(row.get("DisplayLatency"))
+            if latency is None or latency < 0:
                 result["presentmon_dropped_rows"] += 1
                 continue
             result["presentmon_displayed_rows"] += 1
+            swapchain = row.get("SwapChainAddress", "main")
+            displayed_epoch = stamp + latency / 1000.0
+            prior = previous_display_epoch_by_swapchain.get(swapchain)
+            if prior is not None and displayed_epoch > prior:
+                displayed_gaps_ms.append(1000.0 * (displayed_epoch - prior))
+            previous_display_epoch_by_swapchain[swapchain] = displayed_epoch
             for key in NUMERIC_COLUMNS:
                 v = number(row.get(key))
                 if v is not None and v >= 0:
@@ -120,10 +130,15 @@ def analyze_run(folder: Path) -> dict:
         return result
     result["window_coverage_s"] = round((last-first) if first is not None and last is not None else 0, 3)
     result["display_latency_p99_ms"] = percentile(samples["DisplayLatency"], .99)
-    result["display_change_p99_ms"] = percentile(samples["MsBetweenDisplayChange"], .99)
-    result["present_interval_p99_ms"] = percentile(samples["MsBetweenPresents"], .99)
-    result["gpu_work_p99_ms"] = percentile(samples["MsGPUTime"], .99)
-    if result["presentmon_displayed_rows"] < 100 or result["window_coverage_s"] < .85 * (end-start):
+    # Derive actual display-change cadence from CPU start + measured display latency,
+    # per swap chain; do not conflate CPU frame intervals with screen updates.
+    result["display_change_p99_ms"] = percentile(displayed_gaps_ms, .99)
+    result["present_interval_p99_ms"] = percentile(displayed_gaps_ms, .99)
+    result["gpu_work_p99_ms"] = percentile(samples["GPUTime"], .99)
+    result["cpu_frame_time_p99_ms"] = percentile(samples["FrameTime"], .99)
+    result["displayed_time_p99_ms"] = percentile(samples["DisplayedTime"], .99)
+    if (result["presentmon_displayed_rows"] < 100 or len(displayed_gaps_ms) < 30
+            or result["window_coverage_s"] < .85 * (end-start)):
         result["presentation_status"] = "ETW_INCOMPLETE"
         result["reason"] = "Insufficient displayed frames or under 85% timestamp coverage"
         return result

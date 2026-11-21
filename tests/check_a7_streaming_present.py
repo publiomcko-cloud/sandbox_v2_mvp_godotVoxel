@@ -34,6 +34,8 @@ assert "voxel_threads_requested=0" in campaign and "ResourceTelemetry=$true" in 
 assert "interactive-gpu" in workflow
 assert "B2A706BC6AD475749E3B7E3409263AA1E6906D45BDCF993F6DBC0F660188F1AF" in campaign
 assert "strict_acceptance" in parser_file.read_text(encoding="utf-8")
+assert module.epoch("2026-11-1 9:02:03.123456789") is not None
+assert module.epoch("not-a-presentmon-time") is None
 
 with tempfile.TemporaryDirectory() as t:
     folder = Path(t)

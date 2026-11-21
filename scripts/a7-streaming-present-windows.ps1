@@ -70,10 +70,12 @@ $manifest = [ordered]@{
     runs=@()
 }
 $seq=0
+$routeIndex=0
 try {
     foreach ($route in $routes) {
         # Alternate which arm runs first by route, without changing the game.
-        $arms = if ($FastSmoke) { @('on') } elseif ($seq % 2 -eq 0) { @('on','off') } else { @('off','on') }
+        $arms = if ($FastSmoke) { @('on') } elseif ($routeIndex % 2 -eq 0) { @('on','off') } else { @('off','on') }
+        $routeIndex++
         foreach ($arm in $arms) {
             $seq++
             $label = "s{0:D2}_{1}_{2}" -f $seq,$route.name,("vsync_"+$arm)

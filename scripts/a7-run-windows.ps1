@@ -181,6 +181,9 @@ foreach ($name in $scenarios) {
                 schema='a7_presentmon_status_v1'
                 requested=[bool]$PresentMonExe
                 process_id=$p.Id
+                etw_session_name=$null
+                presentmon_csv_format='v2_metrics'
+                stderr_path=(Join-Path $folder 'a7_presentmon_stderr.txt')
                 collection_started=$false
                 exit_code=$null
                 csv_exists=$false
@@ -190,17 +193,22 @@ foreach ($name in $scenarios) {
             }
             if ($PresentMonExe) {
                 try {
-                    $pmArgs = '--process_id ' + $p.Id + ' --date_time --output_file "' + $pmCsv + '" --no_console_stats --terminate_on_proc_exit --terminate_after_timed --timed ' + ([int][Math]::Ceiling($Warmup+$Duration+45))
+                    # PresentMon 2.6.0 exits 6 when the default ETW session name is already in use.
+                    # Each capture owns a unique session and must never stop an unrelated session.
+                    $pmSession = ('A7_' + $p.Id + '_' + [guid]::NewGuid().ToString('N'))
+                    $pmStatus.etw_session_name = $pmSession
+                    $pmArgs = '--session_name ' + $pmSession + ' --process_id ' + $p.Id + ' --v2_metrics --date_time --output_file "' + $pmCsv + '" --no_console_stats --terminate_on_proc_exit --terminate_after_timed --timed ' + ([int][Math]::Ceiling($Warmup+$Duration+45))
                     $pmStart = New-Object System.Diagnostics.ProcessStartInfo
                     $pmStart.FileName = $PresentMonExe
                     $pmStart.Arguments = $pmArgs
                     $pmStart.WorkingDirectory = $folder
                     $pmStart.UseShellExecute = $false
                     $pmStart.CreateNoWindow = $true
+                    $pmStart.RedirectStandardError = $true
                     $pmProcess = New-Object System.Diagnostics.Process
                     $pmProcess.StartInfo = $pmStart
                     $pmStatus.collection_started = [bool]$pmProcess.Start()
-                    Write-Host "A7_PRESENTMON_START pid=$($p.Id) started=$($pmStatus.collection_started) output=$pmCsv"
+                    Write-Host "A7_PRESENTMON_START pid=$($p.Id) session=$pmSession started=$($pmStatus.collection_started) output=$pmCsv"
                 } catch {
                     $pmStatus.capture_error=$_.Exception.Message
                     Write-Warning "A7_PRESENTMON_CAPTURE_WARNING: $($pmStatus.capture_error)"
@@ -285,6 +293,11 @@ foreach ($name in $scenarios) {
                         }
                         $pmProcess.Refresh()
                         $pmStatus.exit_code=$pmProcess.ExitCode
+                        $stderrText = $pmProcess.StandardError.ReadToEnd()
+                        [System.IO.File]::WriteAllText([string]$pmStatus.stderr_path,$stderrText)
+                        if (-not [string]::IsNullOrWhiteSpace($stderrText)) {
+                            Write-Warning "A7_PRESENTMON_STDERR: $($stderrText.Trim())"
+                        }
                     } catch {
                         $pmStatus.capture_error=$_.Exception.Message
                     } finally {

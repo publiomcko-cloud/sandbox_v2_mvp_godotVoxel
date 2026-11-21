@@ -1,0 +1,91 @@
+"""A7 ETW diagnostic parser is fail-closed, aligned to the timed moving phase."""
+import csv
+import importlib.util
+import json
+import os
+import shutil
+import tempfile
+from datetime import datetime
+from pathlib import Path
+
+root = Path(__file__).resolve().parents[1]
+parser_file = root / "scripts/a7_streaming_present_report.py"
+spec = importlib.util.spec_from_file_location("a7_present_report", parser_file)
+module = importlib.util.module_from_spec(spec)
+assert spec.loader is not None
+spec.loader.exec_module(module)
+
+for path in [
+    "scripts/a7-streaming-present-windows.ps1",
+    "scripts/a7_streaming_present_report.py",
+    ".github/workflows/a7-streaming-present-interactive.yml",
+]:
+    assert (root / path).is_file(), path
+
+source = (root / "scripts/a7-run-windows.ps1").read_text(encoding="utf-8")
+runtime = (root / "godot/tests/a7_route_runtime.gd").read_text(encoding="utf-8")
+campaign = (root / "scripts/a7-streaming-present-windows.ps1").read_text(encoding="utf-8")
+workflow = (root / ".github/workflows/a7-streaming-present-interactive.yml").read_text(encoding="utf-8")
+assert "PresentMonExe" in source and "a7_presentmon_status.json" in source
+assert "--session_name " in source and "--v2_metrics" in source
+assert "a7_presentmon_stderr.txt" in source
+assert "measurement_epoch_begin_s" in runtime and "measurement_epoch_end_s" in runtime
+assert "voxel_threads_requested=0" in campaign and "ResourceTelemetry=$true" in campaign
+assert "interactive-gpu" in workflow
+assert "B2A706BC6AD475749E3B7E3409263AA1E6906D45BDCF993F6DBC0F660188F1AF" in campaign
+assert "strict_acceptance" in parser_file.read_text(encoding="utf-8")
+assert module.epoch("2026-11-1 9:02:03.123456789") is not None
+assert module.epoch("not-a-presentmon-time") is None
+
+with tempfile.TemporaryDirectory() as t:
+    folder = Path(t)
+    start = 1_700_000_000.0
+    data = {
+        "route": "shoreline_180s", "seed": 20261119,
+        "measurement_epoch_begin_s": start,
+        "measurement_epoch_end_s": start + 10.0,
+        "duration_s":10.0,
+        "frame_start_p99_ms": 16.666, "frame_start_max_ms": 33.2,
+        "voxel_threads_requested":0, "voxel_threads_actual":14,
+        "vsync_mode_actual":0, "min_radial_probe_hits_8":8,
+        "frame_intervals_over_33_ms":1,
+    }
+    (folder/"a7_route.json").write_text(json.dumps(data),encoding="utf-8")
+    miss = module.analyze_run(folder)
+    assert miss["presentation_status"] == "NOT_MEASURED"
+    (folder/"a7_presentmon_status.json").write_text(json.dumps(
+        {"collection_started": True, "exit_code":0, "capture_error":None}
+    ),encoding="utf-8")
+    with (folder/"a7_presentmon.csv").open("w",encoding="utf-8",newline="") as f:
+        w=csv.DictWriter(f,fieldnames=[
+            "CPUStartDateTime","DisplayLatency","DisplayedTime",
+            "FrameTime","CPUBusy","GPUTime","SwapChainAddress"])
+        w.writeheader()
+        for i in range(125):
+            utc = datetime.fromtimestamp(start + 0.1+i*.075)
+            w.writerow({"CPUStartDateTime":utc.isoformat(sep=" "),
+                        "DisplayLatency":"12.5","DisplayedTime":"16.66",
+                        "FrameTime":"75.0","CPUBusy":"1.1","GPUTime":"4.0",
+                        "SwapChainAddress":"0x1234"})
+    out=module.analyze_run(folder)
+    assert out["presentation_status"] == "ETW_ALIGNED",out
+    assert out["presentmon_rows_in_window"] == 125
+    assert out["display_latency_p99_ms"] == 12.5
+    assert out["gpu_work_p99_ms"] == 4.0
+    assert out["cpu_frame_time_p99_ms"] == 75.0
+    assert abs(out["display_change_p99_ms"]-75.0)<0.01
+    assert out["etw_csv_schema"] == "v2_metrics"
+    assert out["strict_acceptance"] == "NOT_QUALIFIED"
+    data["measurement_epoch_begin_s"] = start + 3600
+    data["measurement_epoch_end_s"] = start + 3610
+    (folder/"a7_route.json").write_text(json.dumps(data),encoding="utf-8")
+    incomplete=module.analyze_run(folder)
+    assert incomplete["presentation_status"] == "ETW_INCOMPLETE",incomplete
+    # Actual A7 runner nests reports under <arm>/<route>_seed*_rep01/.
+    nested=folder/"shoreline_180s_seed20261119_rep01"
+    nested.mkdir()
+    for filename in ("a7_route.json","a7_presentmon_status.json","a7_presentmon.csv"):
+        shutil.move(str(folder/filename),str(nested/filename))
+    nested_out=module.analyze_run(folder)
+    assert nested_out["presentation_status"] == "ETW_INCOMPLETE",nested_out
+print("A7_STREAMING_ETW_FAIL_CLOSED_CONTRACT_PASS")

@@ -40,6 +40,12 @@ def epoch(value):
 
 def analyze_run(folder: Path) -> dict:
     summary_path = folder / "a7_route.json"
+    if not summary_path.exists():
+        candidates = list(folder.glob("*/a7_route.json"))
+        if len(candidates) != 1:
+            raise ValueError(f"Expected exactly one A7 route report in {folder}, found {len(candidates)}")
+        summary_path = candidates[0]
+        folder = summary_path.parent
     data = json.loads(summary_path.read_text(encoding="utf-8-sig"))
     start = number(data.get("measurement_epoch_begin_s"))
     end = number(data.get("measurement_epoch_end_s"))

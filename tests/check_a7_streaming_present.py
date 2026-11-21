@@ -26,6 +26,8 @@ runtime = (root / "godot/tests/a7_route_runtime.gd").read_text(encoding="utf-8")
 campaign = (root / "scripts/a7-streaming-present-windows.ps1").read_text(encoding="utf-8")
 workflow = (root / ".github/workflows/a7-streaming-present-interactive.yml").read_text(encoding="utf-8")
 assert "PresentMonExe" in source and "a7_presentmon_status.json" in source
+assert "--session_name " in source and "--v2_metrics" in source
+assert "a7_presentmon_stderr.txt" in source
 assert "measurement_epoch_begin_s" in runtime and "measurement_epoch_end_s" in runtime
 assert "voxel_threads_requested=0" in campaign and "ResourceTelemetry=$true" in campaign
 assert "interactive-gpu" in workflow
@@ -53,19 +55,23 @@ with tempfile.TemporaryDirectory() as t:
     ),encoding="utf-8")
     with (folder/"a7_presentmon.csv").open("w",encoding="utf-8",newline="") as f:
         w=csv.DictWriter(f,fieldnames=[
-            "CPUStartDateTime","DisplayLatency","MsBetweenDisplayChange",
-            "MsBetweenPresents","MsGPUTime"])
+            "CPUStartDateTime","DisplayLatency","DisplayedTime",
+            "FrameTime","CPUBusy","GPUTime","SwapChainAddress"])
         w.writeheader()
         for i in range(125):
             utc = datetime.fromtimestamp(start + 0.1+i*.075)
             w.writerow({"CPUStartDateTime":utc.isoformat(sep=" "),
-                        "DisplayLatency":"12.5","MsBetweenDisplayChange":"16.66",
-                        "MsBetweenPresents":"16.0","MsGPUTime":"4.0"})
+                        "DisplayLatency":"12.5","DisplayedTime":"16.66",
+                        "FrameTime":"75.0","CPUBusy":"1.1","GPUTime":"4.0",
+                        "SwapChainAddress":"0x1234"})
     out=module.analyze_run(folder)
     assert out["presentation_status"] == "ETW_ALIGNED",out
     assert out["presentmon_rows_in_window"] == 125
     assert out["display_latency_p99_ms"] == 12.5
     assert out["gpu_work_p99_ms"] == 4.0
+    assert out["cpu_frame_time_p99_ms"] == 75.0
+    assert abs(out["display_change_p99_ms"]-75.0)<0.01
+    assert out["etw_csv_schema"] == "v2_metrics"
     assert out["strict_acceptance"] == "NOT_QUALIFIED"
     data["measurement_epoch_begin_s"] = start + 3600
     data["measurement_epoch_end_s"] = start + 3610

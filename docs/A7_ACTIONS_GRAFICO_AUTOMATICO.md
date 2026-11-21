@@ -4,15 +4,15 @@ Workflow: .github/workflows/a7-resources-interactive.yml. Branch: exp/a7-resourc
 
 ## Bloqueio identificado
 
-Os primeiros Actions selecionaram dois hosts (DESKTOP-T0U6S55 e DESKTOP-SAFGO15). O segundo possui a GTX 1050 Ti da baseline; ele foi identificado pelo job #44767832543 e seu runner reside em C:\actios-runner-org1. O workflow agora exige a etiqueta exclusiva a7-safgo15-gpu. O preflight confirmou Session 0, onde o serviço Windows não possui desktop gráfico interativo. Não classificar execuções de Session 0 como benchmark da GPU/visual.
+Os primeiros Actions selecionaram dois hosts (DESKTOP-T0U6S55 e DESKTOP-SAFGO15). O segundo possui a GTX 1050 Ti da baseline; ele foi identificado pelo job #44767832543 e seu runner reside em C:\actios-runner-org1. O workflow exige a etiqueta reutilizável interactive-gpu. A qualificação específica da A7 continua limitada ao host DESKTOP-SAFGO15 e à GPU GTX 1050 Ti por verificação independente no preflight. O preflight confirmou Session 0, onde o serviço Windows não possui desktop gráfico interativo. Não classificar execuções de Session 0 como benchmark da GPU/visual.
 
 ## Vincular a execução ao runner correto
 
 Na organização GitHub publiomcko-labs: Settings → Actions → Runners → DESKTOP-SAFGO15 → Labels → New label. Adicione exatamente:
 
-    a7-safgo15-gpu
+    interactive-gpu
 
-O workflow só iniciará quando um runner com essa etiqueta estiver online. Isso evita selecionar outro computador e comprometer a comparação com a GPU GTX 1050 Ti.
+A etiqueta descreve a capacidade de executar gráficos em um desktop interativo, e pode ser reutilizada em outros workflows. Adicione-a somente aos runners com GPU e sessão gráfica ativa. O workflow A7 continua verificando o nome do computador e a GPU da referência; outra máquina será rejeitada, mesmo que tenha a etiqueta.
 
 ## Configuração única no PC do runner
 

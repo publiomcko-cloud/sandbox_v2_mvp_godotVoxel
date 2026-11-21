@@ -60,7 +60,7 @@ $seq=0
 try {
     foreach ($route in $routes) {
         # Alternate which arm runs first by route, without changing the game.
-        $arms = if ($seq % 2 -eq 0) { @('on','off') } else { @('off','on') }
+        $arms = if ($FastSmoke) { @('on') } elseif ($seq % 2 -eq 0) { @('on','off') } else { @('off','on') }
         foreach ($arm in $arms) {
             $seq++
             $label = "s{0:D2}_{1}_{2}" -f $seq,$route.name,("vsync_"+$arm)
@@ -94,12 +94,15 @@ try {
             if (-not $pm.collection_started -or $pm.exit_code -ne 0 -or $pm.csv_bytes -lt 1024) {
                 throw "A7_PRESENTMON_CAPTURE_FAILED $label exit=$($pm.exit_code) csv_bytes=$($pm.csv_bytes) error=$($pm.capture_error)"
             }
-            Write-Host "A7_STREAM_PRESENT_CAPTURED $label csv_bytes=$($pm.csv_bytes)"
+            Write-Host "A7_STREAM_PRESENT_CAPTURED $label csv_bytes=$($pm.csv_bytes) etw_session=$($pm.etw_session_name)"
         }
     }
     & python $reporter $campaign
     if ($LASTEXITCODE -ne 0) { throw 'A7_STREAMING_REPORT_FAILED' }
     $comparison = Get-Content -LiteralPath (Join-Path $campaign 'streaming_comparison.json') -Raw | ConvertFrom-Json
+    if ($FastSmoke -and $comparison.etw_aligned_count -ne $comparison.route_count) {
+        throw "A7_PRESENTMON_PREFLIGHT_NOT_ALIGNED: $($comparison.etw_aligned_count)/$($comparison.route_count); refusing longer GPU benchmark"
+    }
     foreach ($run in $comparison.runs) {
         if ($run.presentation_status -ne 'ETW_ALIGNED') {
             Write-Warning "A7_ETW_NOT_QUALIFIED route=$($run.route) profile=$($run.profile) status=$($run.presentation_status) reason=$($run.reason)"

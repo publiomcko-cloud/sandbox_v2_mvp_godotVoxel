@@ -116,6 +116,11 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_ENV -Value "A7_PRESENTMON_EXE=$exe"
           Write-Host "A7_PRESENTMON_PIN_VERIFIED sha256=$hash"
 
+      - name: Fail-fast ETW smoke (one 30s route, before long streaming)
+        run: |
+          & ./scripts/a7-streaming-present-windows.ps1 -PresentMonExe $env:A7_PRESENTMON_EXE -FastSmoke
+          if (-not $?) { throw 'A7 short ETW smoke failed; long campaign was not started' }
+
       - name: Run longer streaming A-B with automatic workers and ETW presentation
         run: |
           & ./scripts/a7-streaming-present-windows.ps1 -PresentMonExe $env:A7_PRESENTMON_EXE

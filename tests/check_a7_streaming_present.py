@@ -3,6 +3,7 @@ import csv
 import importlib.util
 import json
 import os
+import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -78,4 +79,11 @@ with tempfile.TemporaryDirectory() as t:
     (folder/"a7_route.json").write_text(json.dumps(data),encoding="utf-8")
     incomplete=module.analyze_run(folder)
     assert incomplete["presentation_status"] == "ETW_INCOMPLETE",incomplete
+    # Actual A7 runner nests reports under <arm>/<route>_seed*_rep01/.
+    nested=folder/"shoreline_180s_seed20261119_rep01"
+    nested.mkdir()
+    for filename in ("a7_route.json","a7_presentmon_status.json","a7_presentmon.csv"):
+        shutil.move(str(folder/filename),str(nested/filename))
+    nested_out=module.analyze_run(folder)
+    assert nested_out["presentation_status"] == "ETW_INCOMPLETE",nested_out
 print("A7_STREAMING_ETW_FAIL_CLOSED_CONTRACT_PASS")

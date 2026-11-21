@@ -24,8 +24,13 @@ jobs:
     defaults:
       run:
         shell: powershell -NoProfile -ExecutionPolicy Bypass -File {0}
+        working-directory: a7-graphical-isolated
     steps:
+      # Never re-enter the legacy shared checkout containing the broken .venv.
       - uses: actions/checkout@v4
+        with:
+          path: a7-graphical-isolated
+          clean: false
 
       - name: Reject Session 0 and verify interactive display
         run: |
@@ -89,15 +94,16 @@ jobs:
         run: |
           uv python install 3.12
           if ($LASTEXITCODE -ne 0) { throw 'uv python install failed' }
-          uv venv .venv --python 3.12
+          $venv = Join-Path $env:RUNNER_TEMP 'a7-python-env'
+          uv venv $venv --python 3.12
           if ($LASTEXITCODE -ne 0) { throw 'uv venv failed' }
-          $scripts = (Resolve-Path .venv/Scripts).Path
+          $scripts = Join-Path $venv 'Scripts'
           Add-Content -LiteralPath $env:GITHUB_PATH -Value $scripts
-          & .venv/Scripts/python.exe --version
+          & (Join-Path $scripts 'python.exe') --version
 
       - name: A7 static contracts (no graphical PASS)
         run: |
-          & .venv/Scripts/python.exe tests/check_a7_contract.py
+          & python tests/check_a7_contract.py
           if ($LASTEXITCODE -ne 0) { throw 'A7 static contract failed' }
 
       - name: Restore approved A3 native DLL
@@ -106,7 +112,7 @@ jobs:
           name: a0-build-snapshot
           run-id: 44522153759
           github-token: ${{ github.token }}
-          path: .
+          path: a7-graphical-isolated
 
       - name: Prepare pinned Godot runtime and native DLL
         run: |
@@ -126,5 +132,5 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
           path: |
-            reports/generated/a7-interactive-preflight.json
-            reports/generated/a7-resources/**/*
+            a7-graphical-isolated/reports/generated/a7-interactive-preflight.json
+            a7-graphical-isolated/reports/generated/a7-resources/**/*

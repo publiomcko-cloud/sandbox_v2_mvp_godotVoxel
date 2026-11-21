@@ -28,6 +28,11 @@ assert "EDIT_COUNT := 100" in edit and "RATE_S := 0.1" in edit
 assert "frame_post_draw" in edit and '"first_correct_presented_pixel_ms":null' in edit
 assert '"edit_100_gate":"NOT_QUALIFIED"' in edit
 assert "A7_NO_AUTOMATIC_ACCEPTANCE" in shell
+assert "VoxelEngine.set_thread_count" in route and "vsync-off" in route
+assert "voxel_threads_actual" in runtime and "voxel_workers" in runtime
+assert "ResourceTelemetry" in shell and "a7_process_resources.json" in shell
+assert (root/"scripts/a7-resources-ab-windows.ps1").is_file()
+assert (root/"docs/A7_RECURSOS_AB.md").is_file()
 assert "a7_reopen.json" in shell and "A7_REOPEN_FUNCTIONAL_SMOKES_PASS" in shell
 assert "Seeds.Count -lt 3" in shell and "A7_CAMPAIGN_DIR" in shell
 assert "mesh_block_size = 16" in scene and "view_distance = 192" in scene

@@ -8,6 +8,8 @@ var warmup_s := 45.0
 var seed_value := 20261119
 var ci_smoke := false
 var capture := false
+var vsync_off_requested := false
+var voxel_threads_requested := 0
 
 var _world: Node3D
 var _terrain: VoxelLodTerrain
@@ -68,6 +70,11 @@ func _ready() -> void:
         "viewport_px":str(get_viewport().get_visible_rect().size),
         "fov_degrees":_camera_initial_fov, "headless":DisplayServer.get_name()=="headless",
         "capture":capture, "ci_smoke":ci_smoke,
+        "vsync_off_requested":vsync_off_requested,
+        "vsync_mode_actual":int(DisplayServer.window_get_vsync_mode()) if DisplayServer.get_name()!="headless" else -1,
+        "engine_max_fps":Engine.max_fps,
+        "voxel_threads_requested":voxel_threads_requested,
+        "voxel_threads_observed":VoxelEngine.get_thread_count(),
         "mesh_block_size":_terrain.mesh_block_size,
         "view_distance":_terrain.view_distance,
         "lod_count":_terrain.lod_count,
@@ -99,6 +106,9 @@ func _sample(phase: String, t: float) -> void:
     if hits == 8 and _ready_at_ms < 0.0:
         _ready_at_ms = float(Time.get_ticks_usec() - _begin_us)/1000.0
     var rid := get_viewport().get_viewport_rid()
+    var voxel_stats: Dictionary = VoxelEngine.get_stats()
+    var pools: Dictionary = voxel_stats.get("thread_pools", {})
+    var general_pool: Dictionary = pools.get("general", {})
     _emit({
         "type":"sample", "phase":phase, "t_s":snappedf(t,0.001),
         "player_x":_player.global_position.x, "player_y":_player.global_position.y,
@@ -108,6 +118,9 @@ func _sample(phase: String, t: float) -> void:
         "rocks_instanced":_instancer.debug_get_instance_counts(),
         "rock_instance_blocks":_instancer.debug_get_block_count(),
         "water":_water.call("get_report"),
+        "voxel_workers":{"thread_count":VoxelEngine.get_thread_count(),
+            "active_threads":int(general_pool.get("active_threads",-1)),
+            "queued_tasks":int(general_pool.get("tasks",-1))},
         "process_ms":1000.0*Performance.get_monitor(Performance.TIME_PROCESS),
         "physics_ms":1000.0*Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS),
         "viewport_render_cpu_ms":RenderingServer.viewport_get_measured_render_time_cpu(rid) if not ci_smoke else 0.0,
@@ -199,6 +212,11 @@ func _finish() -> void:
         "schema":"a7_route_v1","route":route,"seed":seed_value,
         "duration_s":duration_s,"warmup_s":warmup_s,
         "ci_smoke":ci_smoke, "capture":capture,
+        "vsync_off_requested":vsync_off_requested,
+        "vsync_mode_actual":int(DisplayServer.window_get_vsync_mode()) if DisplayServer.get_name()!="headless" else -1,
+        "engine_max_fps":Engine.max_fps,
+        "voxel_threads_requested":voxel_threads_requested,
+        "voxel_threads_actual":VoxelEngine.get_thread_count(),
         "frame_count":_intervals.size(),
         "frame_start_p50_ms":_percentile(_intervals,0.5),
         "frame_start_p95_ms":_percentile(_intervals,0.95),

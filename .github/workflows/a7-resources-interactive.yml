@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   windows-graphical-ab:
-    runs-on: [self-hosted, Windows, X64, a7-safgo15-gpu]
+    runs-on: [self-hosted, Windows, X64, interactive-gpu]
     timeout-minutes: 50
     # Local runner may have Restricted machine policy; never change it globally.
     env:

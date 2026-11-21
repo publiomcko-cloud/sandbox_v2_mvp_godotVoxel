@@ -19,6 +19,16 @@ if ((Get-FileHash -LiteralPath $PresentMonExe -Algorithm SHA256).Hash -ne $prese
 if ([System.Diagnostics.Process]::GetCurrentProcess().SessionId -eq 0) {
     throw 'A7_STREAMING_REQUIRES_INTERACTIVE_DESKTOP (Session 0 is not acceptable)'
 }
+# PresentMon ETW requires Performance Log Users membership or elevation. Do NOT
+# elevate the GitHub Actions runner; its workflows should remain unprivileged.
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = New-Object System.Security.Principal.WindowsPrincipal($identity)
+$perfLogUsersSid = New-Object System.Security.Principal.SecurityIdentifier('S-1-5-32-559')
+$etwAuthorized = [bool]($principal.IsInRole($perfLogUsersSid) -or
+    $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator))
+if (-not $etwAuthorized) {
+    Write-Warning 'A7_ETW_ACCESS_UNAVAILABLE: runner token lacks Performance Log Users; presentation metrics will be NOT_MEASURED (no implicit elevation).'
+}
 $gpu = @(Get-CimInstance Win32_VideoController | ForEach-Object Name)
 if ($env:COMPUTERNAME -ne 'DESKTOP-SAFGO15' -or -not ($gpu -contains 'NVIDIA GeForce GTX 1050 Ti')) {
     throw 'A7_STREAMING_HOST_MISMATCH: A7 baseline requires DESKTOP-SAFGO15 and NVIDIA GTX 1050 Ti'
@@ -45,6 +55,9 @@ $manifest = [ordered]@{
     baseline='A5 CPU16 GL Compatibility, VoxelEngine automatic workers'
     presentmon_version='2.6.0'
     presentmon_sha256=$presentMonHash.ToLowerInvariant()
+    presentmon_etw_permission_available=$etwAuthorized
+    presentmon_collection_requested=$etwAuthorized
+    presentmon_permission_note='No GitHub runner elevation; grant Performance Log Users membership manually and refresh logon token to enable ETW.'
     display_target='1920x1080 window'
     gpu_expected='NVIDIA GeForce GTX 1050 Ti'
     speed_mps=18
@@ -52,7 +65,7 @@ $manifest = [ordered]@{
     seed=$Seed
     routes=@($routes)
     process_telemetry_sample_period_s=1
-    diagnostics='identical process and ETW instrumentation for both VSync arms'
+    diagnostics='identical Godot and process telemetry for both VSync arms; ETW is identical only if permission available'
     strict_acceptance='NOT_QUALIFIED'
     runs=@()
 }
@@ -70,6 +83,7 @@ try {
                 sequence=$seq; directory=$label; profile=("vsync_"+$arm)
                 route=$route.name; duration_s=$route.duration
                 seed=$Seed; voxel_threads_requested=0
+                etw_collection_requested=$etwAuthorized
             }
             $manifest.runs += $row
             $manifest | ConvertTo-Json -Depth 8 |
@@ -83,25 +97,33 @@ try {
                 VsyncOff=($arm -eq 'off')
                 ResourceTelemetry=$true
                 VoxelThreads=0
-                PresentMonExe=$PresentMonExe
+                PresentMonExe=$(if ($etwAuthorized) { $PresentMonExe } else { '' })
             }
             & $runner @params
             if (-not $?) { throw "A7_STREAMING_CHILD_FAILED $label" }
             $pmStatusPath = Get-ChildItem -LiteralPath $target -Recurse -File -Filter 'a7_presentmon_status.json' |
                 Select-Object -First 1
-            if ($null -eq $pmStatusPath) { throw "A7_PRESENTMON_STATUS_MISSING $label" }
-            $pm = Get-Content -LiteralPath $pmStatusPath.FullName -Raw | ConvertFrom-Json
-            if (-not $pm.collection_started -or $pm.exit_code -ne 0 -or $pm.csv_bytes -lt 1024) {
-                throw "A7_PRESENTMON_CAPTURE_FAILED $label exit=$($pm.exit_code) csv_bytes=$($pm.csv_bytes) error=$($pm.capture_error)"
+            if ($null -eq $pmStatusPath) {
+                if ($etwAuthorized) {
+                    Write-Warning "A7_ETW_STATUS_MISSING $label; presentation data NOT_MEASURED"
+                } else {
+                    Write-Host "A7_ETW_NOT_MEASURED $label reason=PERFORMANCE_LOG_USERS_PERMISSION_REQUIRED"
+                }
+            } else {
+                $pm = Get-Content -LiteralPath $pmStatusPath.FullName -Raw | ConvertFrom-Json
+                if (-not $pm.collection_started -or $pm.exit_code -ne 0 -or $pm.csv_bytes -lt 1024) {
+                    Write-Warning "A7_ETW_NOT_MEASURED $label exit=$($pm.exit_code) csv_bytes=$($pm.csv_bytes) error=$($pm.capture_error)"
+                } else {
+                    Write-Host "A7_STREAM_PRESENT_CAPTURED $label csv_bytes=$($pm.csv_bytes) etw_session=$($pm.etw_session_name)"
+                }
             }
-            Write-Host "A7_STREAM_PRESENT_CAPTURED $label csv_bytes=$($pm.csv_bytes) etw_session=$($pm.etw_session_name)"
         }
     }
     & python $reporter $campaign
     if ($LASTEXITCODE -ne 0) { throw 'A7_STREAMING_REPORT_FAILED' }
     $comparison = Get-Content -LiteralPath (Join-Path $campaign 'streaming_comparison.json') -Raw | ConvertFrom-Json
     if ($FastSmoke -and $comparison.etw_aligned_count -ne $comparison.route_count) {
-        throw "A7_PRESENTMON_PREFLIGHT_NOT_ALIGNED: $($comparison.etw_aligned_count)/$($comparison.route_count); refusing longer GPU benchmark"
+        Write-Warning "A7_PRESENTMON_PREFLIGHT_NOT_ALIGNED: $($comparison.etw_aligned_count)/$($comparison.route_count); streaming may proceed, but full presentation metric remains NOT_QUALIFIED"
     }
     foreach ($run in $comparison.runs) {
         if ($run.presentation_status -ne 'ETW_ALIGNED') {

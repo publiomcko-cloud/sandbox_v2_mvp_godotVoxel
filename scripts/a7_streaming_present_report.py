@@ -4,6 +4,7 @@ import csv
 import datetime as dt
 import json
 import math
+import re
 import sys
 import time
 from pathlib import Path
@@ -36,7 +37,19 @@ def epoch(value):
         # PresentMon date_time uses the local Windows host time.
         return time.mktime(d.timetuple()) + d.microsecond/1e6
     except (ValueError, OverflowError):
-        return None
+        # PresentMon's native DateTime formatter does not zero-pad month/day/hour
+        # and emits nine fractional digits. Python fromisoformat rejects that.
+        match = re.fullmatch(r"(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,9}))?", v)
+        if match is None:
+            return None
+        year, month, day, hour, minute, second, fraction = match.groups()
+        try:
+            micros = int(((fraction or "") + "000000")[:6])
+            local = dt.datetime(int(year), int(month), int(day), int(hour),
+                                int(minute), int(second), micros)
+            return time.mktime(local.timetuple()) + local.microsecond / 1e6
+        except (ValueError, OverflowError):
+            return None
 
 def analyze_run(folder: Path) -> dict:
     summary_path = folder / "a7_route.json"

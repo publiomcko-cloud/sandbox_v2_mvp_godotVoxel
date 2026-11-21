@@ -43,6 +43,10 @@ Arquivos principais no artefato:
 - a7_presentmon.csv.zip: evidência bruta sem perdas
 - a7_present_analysis.json: tempos de apresentação e status de alinhamento
 
+O PresentMon exige que o usuário Windows do runner pertença ao grupo **Performance Log Users** (SID S-1-5-32-559) ou que o processo seja elevado. O workflow **não eleva privilégios nem altera a associação a grupos**. Sem essa permissão, a campanha continua medindo CPU, GPU parcial e streaming em ambos os braços; os campos de apresentação são marcados como `NOT_MEASURED`, sem fingir aprovação. As capturas ETW inválidas também não causam aprovação.
+
+Para habilitar ETW posteriormente, um administrador pode adicionar explicitamente a conta `DESKTOP-SAFGO15\\PUBLI` ao grupo local Performance Log Users e depois criar uma **nova sessão de logon** para atualizar o token Windows. O usuário deverá concordar com essa mudança; a execução atual não a fará automaticamente. Não executar todo o runner GitHub Actions como administrador.
+
 Se o ETW não funcionar em OpenGL/driver ou a conta do runner não possuir permissões adequadas, manter status não qualificado; não elevar privilégios automaticamente nem alterar o Windows sem autorização.
 
 ## Critério de promoção
